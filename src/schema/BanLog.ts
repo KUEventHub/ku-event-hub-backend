@@ -1,5 +1,5 @@
 import mongoose, { Schema, model } from "mongoose";
-import { getMissingAttributeString } from "../helper/schema.ts";
+import { getMissingAttributeString } from "../helper/schemaErrors.ts";
 
 const schema = new Schema({
   time: {

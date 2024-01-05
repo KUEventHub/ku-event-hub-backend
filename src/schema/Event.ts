@@ -2,7 +2,7 @@ import mongoose, { Schema, model } from "mongoose";
 import {
   getMinimumValueString,
   getMissingAttributeString,
-} from "../helper/schema.ts";
+} from "../helper/schemaErrors.ts";
 
 const schema = new Schema({
   name: {

@@ -1,38 +1,35 @@
-import { ObjectId, Schema, model } from "mongoose";
+import mongoose, { Schema, model } from "mongoose";
 import { EMAIL_REGEX, FACULTY_LIST } from "../helper/constants.ts";
 import {
-  getDuplicateValueString,
   getInvalidValueString,
   getMaximumLengthString,
   getMinimumLengthString,
   getMissingAttributeString,
-} from "../helper/schema.ts";
+} from "../helper/schemaErrors.ts";
 
 const schema = new Schema({
   // user information
   role: {
     type: String,
-    required: [true, getMissingAttributeString("role")],
     enum: {
       values: ["user", "admin"],
       message: getInvalidValueString("role"),
     },
+    default: "user",
   },
   username: {
     type: String,
-    unique: [true, getDuplicateValueString("username")],
     required: [true, getMissingAttributeString("username")],
     min: [4, getMinimumLengthString("username", 4)],
     max: [15, getMaximumLengthString("username", 15)],
   },
   firstName: {
     type: String,
-    required: [true, getMissingAttributeString("firstName")],
-    min: [1, getMinimumLengthString("firstName", 1)],
+    default: "",
   },
   lastName: {
     type: String,
-    required: [true, getMissingAttributeString("lastName")],
+    default: "",
   },
   email: {
     type: String,
@@ -45,9 +42,9 @@ const schema = new Schema({
   },
   faculty: {
     type: String,
-    required: [true, getMissingAttributeString("faculty")],
+    default: "none",
     enum: {
-      values: [...FACULTY_LIST, "other"],
+      values: [...FACULTY_LIST, "none", "other"],
       message: getInvalidValueString("faculty"),
     },
   },
@@ -57,7 +54,7 @@ const schema = new Schema({
   },
   gender: {
     type: String,
-    required: [true, getMissingAttributeString("gender")],
+    default: "other",
     enum: {
       values: ["male", "female", "other"],
       message: getInvalidValueString("gender"),
@@ -102,14 +99,38 @@ const schema = new Schema({
   interestedEventTypes: {
     // event types user are interested in
     // `EventType` ObjectId
-    type: Array<ObjectId>,
+    type: Array<mongoose.Types.ObjectId>,
     default: [],
   },
   joinedEvents: {
     // events user have joined
     // `Participation` ObjectId
-    type: Array<ObjectId>,
+    type: Array<mongoose.Types.ObjectId>,
     default: [],
+  },
+  friends: {
+    // friends user have
+    // `User` ObjectId
+    type: Array<mongoose.Types.ObjectId>,
+    default: [],
+  },
+  // receivedFriendRequests: {
+  //   // friend requests user received
+  //   // `FriendRequest` ObjectId
+  //   type: Array<mongoose.Types.ObjectId>,
+  //   default: [],
+  // },
+  // sentFriendRequests: {
+  //   // friend requests user sent
+  //   // `FriendRequest` ObjectId
+  //   type: Array<mongoose.Types.ObjectId>,
+  //   default: [],
+  // },
+  ban: {
+    // ban status
+    // `BanLog` ObjectId
+    type: mongoose.Types.ObjectId,
+    default: null,
   },
 });
 
