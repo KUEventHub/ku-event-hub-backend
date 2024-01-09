@@ -6,10 +6,7 @@ import {
   findUserWithAuth0Id,
   getUserAuth0Id,
 } from "../services/users.ts";
-import Event from "../schema/Event.ts";
-import User from "../schema/User.ts";
 import { getEventTypesFromStrings } from "../services/eventtypes.ts";
-import EventType from "../schema/EventType.ts";
 
 const router = Router();
 
@@ -108,7 +105,7 @@ router.post("/create", checkJwt, async (req, res) => {
 
 /**
  * @route get /api/users/:id
- * 
+ *
  * :id = user's _id
  * finds a user in the database and returns information
  * based on user's privacy settings
@@ -117,7 +114,6 @@ router.post("/create", checkJwt, async (req, res) => {
  * - 200: {message, user: {username, profilePictureUrl, information, events, friends}}
  * (information, events, friends has field `show`)
  * that is either true or false depending on privacy settings
- * - 400: {error}
  */
 router.get("/:id", async (req, res) => {
   // get id from url params
@@ -225,10 +221,7 @@ router.get("/:id", async (req, res) => {
  * - user has to be the same as the user in the url
  *
  * results:
- * - 200: {message, user: {username, profilePictureUrl, information, events, friends}}
- * (information, events, friends has field `show`)
- * that is either true or false depending on privacy settings
- * - 400: {error}
+ * - 200: {message}
  */
 router.post("/:id/edit", checkJwt, async (req, res) => {
   // get id from url params
@@ -296,6 +289,59 @@ router.post("/:id/edit", checkJwt, async (req, res) => {
 
     res.status(200).send({
       message: "User updated successfully",
+    });
+  } catch (e: any) {
+    // handle errors
+    console.error(e);
+    res.status(400).send(e);
+  }
+});
+
+/**
+ * @route post /api/users/:id/upload-profile-picture
+ * :id = user's _id
+ * finds a user in the database and uploads a profile picture
+ * not finished though
+ */
+router.post("/:id/upload-profile-picture", checkJwt, async (req, res) => {
+  // get id from url params
+  const id = req.params.id;
+
+  const body: {
+    user: {
+      profilePicture: string;
+    };
+  } = req.body;
+
+  try {
+    // get user's auth0 id
+    const token = req.get("Authorization");
+    const auth0id = getUserAuth0Id(token!);
+    const auth0user = await findUserWithAuth0Id(auth0id);
+
+    // if there's no user with auth0 id, respond with error
+    if (!auth0user) {
+      res.status(404).send({
+        error: "User not found",
+      });
+      return;
+    }
+
+    // if user is not the same as the user in the url, respond with error
+    if (auth0user._id.toString() !== id) {
+      res.status(401).send({
+        error: "Unauthorized",
+      });
+      return;
+    }
+
+    // todo: login firebase to get authorization
+    // upload profile picture to firebase
+    // get the profile picture's link
+
+    res.status(200).send({
+      message: "User updated successfully",
+      profilePictureUrl: body.user.profilePicture,
     });
   } catch (e: any) {
     // handle errors
