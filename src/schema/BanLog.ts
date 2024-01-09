@@ -1,5 +1,6 @@
 import mongoose, { Schema, model } from "mongoose";
 import { getMissingAttributeString } from "../helper/schemaErrors.ts";
+import { TABLES } from "../helper/constants.ts";
 
 const schema = new Schema({
   time: {
@@ -27,15 +28,17 @@ const schema = new Schema({
     // `User` ObjectId
     type: mongoose.Types.ObjectId,
     required: [true, getMissingAttributeString("bannedUser")],
+    ref: TABLES.USER,
   },
   bannedBy: {
     // the user (admin) who banned this user
     // `User` ObjectId
     type: mongoose.Types.ObjectId,
     required: [true, getMissingAttributeString("bannedBy")],
+    ref: TABLES.USER,
   },
 });
 
-const BanLog = model("banLogs", schema);
+const BanLog = model(TABLES.BAN_LOG, schema);
 
 export default BanLog;

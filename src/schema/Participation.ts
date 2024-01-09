@@ -1,5 +1,6 @@
 import mongoose, { Schema, model } from "mongoose";
 import { getMissingAttributeString } from "../helper/schemaErrors.ts";
+import { TABLES } from "../helper/constants.ts";
 
 const schema = new Schema({
   createdAt: {
@@ -22,15 +23,17 @@ const schema = new Schema({
     // `Event` ObjectId
     type: mongoose.Types.ObjectId,
     required: [true, getMissingAttributeString("event")],
+    ref: TABLES.EVENT,
   },
   user: {
     // the user related to this participation
     // `User` ObjectId
     type: mongoose.Types.ObjectId,
     required: [true, getMissingAttributeString("user")],
+    ref: TABLES.USER,
   },
 });
 
-const Participation = model("participations", schema);
+const Participation = model(TABLES.PARTICIPATION, schema);
 
 export default Participation;

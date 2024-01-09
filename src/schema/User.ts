@@ -1,5 +1,5 @@
 import mongoose, { Schema, model } from "mongoose";
-import { EMAIL_REGEX, FACULTY_LIST } from "../helper/constants.ts";
+import { EMAIL_REGEX, FACULTY_LIST, TABLES } from "../helper/constants.ts";
 import {
   getInvalidValueString,
   getMaximumLengthString,
@@ -16,6 +16,10 @@ const schema = new Schema({
       message: getInvalidValueString("role"),
     },
     default: "user",
+  },
+  auth0UserId: {
+    type: String,
+    required: [true, getMissingAttributeString("auth0UserId")],
   },
   username: {
     type: String,
@@ -44,6 +48,7 @@ const schema = new Schema({
     type: String,
     default: "none",
     enum: {
+      // might need to move this to another table
       values: [...FACULTY_LIST, "none", "other"],
       message: getInvalidValueString("faculty"),
     },
@@ -56,6 +61,7 @@ const schema = new Schema({
     type: String,
     default: "other",
     enum: {
+      // might need to move this to another table
       values: ["male", "female", "other"],
       message: getInvalidValueString("gender"),
     },
@@ -101,18 +107,21 @@ const schema = new Schema({
     // `EventType` ObjectId
     type: Array<mongoose.Types.ObjectId>,
     default: [],
+    ref: TABLES.EVENT_TYPE,
   },
   joinedEvents: {
     // events user have joined
     // `Participation` ObjectId
     type: Array<mongoose.Types.ObjectId>,
     default: [],
+    ref: TABLES.PARTICIPATION,
   },
   friends: {
     // friends user have
     // `User` ObjectId
     type: Array<mongoose.Types.ObjectId>,
     default: [],
+    ref: TABLES.USER,
   },
   // receivedFriendRequests: {
   //   // friend requests user received
@@ -131,9 +140,10 @@ const schema = new Schema({
     // `BanLog` ObjectId
     type: mongoose.Types.ObjectId,
     default: null,
+    ref: TABLES.BAN_LOG,
   },
 });
 
-const User = model("users", schema);
+const User = model(TABLES.USER, schema);
 
 export default User;

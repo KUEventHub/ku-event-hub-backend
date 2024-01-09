@@ -22,3 +22,18 @@ export const FACULTY_LIST = [
 ];
 
 export const EMAIL_REGEX = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
+
+export const ROLES = {
+  ADMIN: "admin",
+  USER: "user",
+};
+
+export const TABLES = {
+  BAN_LOG: "banlogs",
+  EVENT: "events",
+  EVENT_TYPE: "eventtypes",
+  FRIEND_REQUEST: "friendrequests",
+  LOGIN_LOG: "loginlogs",
+  PARTICIPATION: "participations",
+  USER: "users",
+}

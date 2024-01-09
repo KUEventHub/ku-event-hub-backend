@@ -1,5 +1,6 @@
 import mongoose, { Schema, model } from "mongoose";
 import { getMissingAttributeString } from "../helper/schemaErrors.ts";
+import { TABLES } from "../helper/constants.ts";
 
 const schema = new Schema({
   createdAt: {
@@ -27,15 +28,17 @@ const schema = new Schema({
     // `User` ObjectId
     type: mongoose.Types.ObjectId,
     required: [true, getMissingAttributeString("from")],
+    ref: TABLES.USER,
   },
   to: {
     // the user who received the friend request
     // `User` ObjectId
     type: mongoose.Types.ObjectId,
     required: [true, getMissingAttributeString("to")],
+    ref: TABLES.USER,
   },
 });
 
-const FriendRequest = model("friendRequests", schema);
+const FriendRequest = model(TABLES.FRIEND_REQUEST, schema);
 
 export default FriendRequest;

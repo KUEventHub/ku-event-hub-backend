@@ -1,5 +1,6 @@
 import mongoose, { Schema, model } from "mongoose";
 import { getMissingAttributeString } from "../helper/schemaErrors.ts";
+import { TABLES } from "../helper/constants.ts";
 
 const schema = new Schema({
   time: {
@@ -14,9 +15,10 @@ const schema = new Schema({
     // `User` ObjectId
     type: mongoose.Types.ObjectId,
     required: [true, getMissingAttributeString("user")],
+    ref: TABLES.USER,
   },
 });
 
-const LoginLog = model("loginLogs", schema);
+const LoginLog = model(TABLES.LOGIN_LOG, schema);
 
 export default LoginLog;

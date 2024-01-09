@@ -3,6 +3,7 @@ import {
   getMinimumValueString,
   getMissingAttributeString,
 } from "../helper/schemaErrors.ts";
+import { TABLES } from "../helper/constants.ts";
 
 const schema = new Schema({
   name: {
@@ -63,21 +64,24 @@ const schema = new Schema({
     // `User` ObjectId
     type: mongoose.Types.ObjectId,
     default: null,
+    ref: TABLES.USER,
   },
   joinedUsers: {
     // users that joined this event
     // `Participation` ObjectId
     type: Array<mongoose.Types.ObjectId>,
     default: null,
+    ref: TABLES.PARTICIPATION,
   },
   eventTypes: {
     // event types of this event
     // `EventType` ObjectId
     type: Array<mongoose.Types.ObjectId>,
     default: null,
+    ref: TABLES.EVENT_TYPE,
   },
 });
 
-const Event = model("events", schema);
+const Event = model(TABLES.EVENT, schema);
 
 export default Event;
