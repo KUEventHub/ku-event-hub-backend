@@ -14,7 +14,8 @@ const router = Router();
 
 /**
  * @route post /api/users/create
- * creates a new user, saves it to the database
+ * creates a new user, saves it to the database.
+ * also creates a new user in firebase
  *
  * requirements:
  * - authorization: Bearer <access_token>
