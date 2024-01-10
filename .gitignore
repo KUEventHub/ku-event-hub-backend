@@ -5,6 +5,7 @@
 
 # config (environment files)
 .env
+firebase-config.json
 
 # dependencies
 /node_modules

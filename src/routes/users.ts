@@ -1,12 +1,14 @@
 import { Router } from "express";
-import { checkJwt } from "../services/auth.ts";
+import { checkJwt } from "../middleware/auth.ts";
 import {
   createUser,
   findUserWithId,
   findUserWithAuth0Id,
-  getUserAuth0Id,
+  getAuth0Id,
 } from "../services/users.ts";
 import { getEventTypesFromStrings } from "../services/eventtypes.ts";
+import { registerUser, signOut } from "../services/firebase.ts";
+import { encryptPassword } from "../services/bcrypt.ts";
 
 const router = Router();
 
@@ -59,7 +61,7 @@ router.post("/create", checkJwt, async (req, res) => {
   try {
     // get user's access token
     const token = req.get("Authorization");
-    const auth0id = getUserAuth0Id(token!);
+    const auth0id = getAuth0Id(token!);
 
     // get event types ids
     const eventTypes = body.user.interestedEventTypes
@@ -91,13 +93,20 @@ router.post("/create", checkJwt, async (req, res) => {
     // create a user from the body
     const user = await createUser(userJson);
 
+    // register user to firebase
+    // also signs out right after registering
+    // because we don't need to keep the user logged in
+    const firebasePassword = await encryptPassword(auth0id);
+    await registerUser(userJson.email, firebasePassword);
+    await signOut();
+
     res.status(200).send({
       message: "User created successfully",
       id: user._id,
     });
   } catch (e: any) {
     // handle errors
-    console.log(e);
+    console.error(e);
 
     res.status(400).send(e);
   }
@@ -124,7 +133,10 @@ router.get("/:id", async (req, res) => {
     const user = await findUserWithId(id);
 
     if (!user) {
-      throw new Error("User not found");
+      res.status(404).send({
+        error: "User not found",
+      });
+      return;
     }
 
     // get privacy settings from user
@@ -244,7 +256,7 @@ router.post("/:id/edit", checkJwt, async (req, res) => {
   try {
     // get user's auth0 id
     const token = req.get("Authorization");
-    const auth0id = getUserAuth0Id(token!);
+    const auth0id = getAuth0Id(token!);
     const auth0user = await findUserWithAuth0Id(auth0id);
 
     // if there's no user with auth0 id, respond with error
@@ -300,7 +312,10 @@ router.post("/:id/edit", checkJwt, async (req, res) => {
 /**
  * @route post /api/users/:id/upload-profile-picture
  * :id = user's _id
- * finds a user in the database and uploads a profile picture
+ * finds a user in the database and uploads a profile picture,
+ * then returns the link to the picture.
+ * also updates the user's profile picture url in the database
+ *
  * not finished though
  */
 router.post("/:id/upload-profile-picture", checkJwt, async (req, res) => {
@@ -316,7 +331,7 @@ router.post("/:id/upload-profile-picture", checkJwt, async (req, res) => {
   try {
     // get user's auth0 id
     const token = req.get("Authorization");
-    const auth0id = getUserAuth0Id(token!);
+    const auth0id = getAuth0Id(token!);
     const auth0user = await findUserWithAuth0Id(auth0id);
 
     // if there's no user with auth0 id, respond with error

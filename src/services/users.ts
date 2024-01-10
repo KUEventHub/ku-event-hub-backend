@@ -61,7 +61,7 @@ export async function findUserWithAuth0Id(auth0Id: string) {
  * @param accessToken user's access token
  * @returns user's auth0 id
  */
-export function getUserAuth0Id(accessToken: string) {
+export function getAuth0Id(accessToken: string) {
   const decodedToken = jwtDecode(accessToken);
   const sub = decodedToken.sub;
 
@@ -74,6 +74,12 @@ export function getUserAuth0Id(accessToken: string) {
   return id;
 }
 
+/**
+ * Updates a user in the database and returns it.
+ * @param id user id (ObjectId)
+ * @param user user information
+ * @returns `User` object
+ */
 export async function updateUser(
   id: string,
   user: {

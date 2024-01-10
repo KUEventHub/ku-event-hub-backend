@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { checkJwt } from "../services/auth.ts";
+import { checkJwt } from "../middleware/auth.ts";
 import Event from "../schema/Event.ts";
 
 const router = Router();
