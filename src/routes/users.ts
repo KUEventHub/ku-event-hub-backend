@@ -28,20 +28,19 @@ const router = Router();
  * - body: {
       user: {
         username: string;
-        firstName?: string;
-        lastName?: string;
+        firstName: string;
+        lastName: string;
         email: string;
-        idCode?: string;
-        faculty?: string;
-        phoneNumber?: string;
-        gender?: string;
+        idCode: string;
+        faculty: string;
+        phoneNumber: string;
+        gender: string;
         description?: string;
         profilePicture: {
           url?: string;
           base64Image?: string;
         };
-        interestedEventTypes?: string[];
-        auth0UserId: string;
+        interestedEventTypes: string[];
       };
     }
  *
@@ -54,20 +53,19 @@ router.post("/create", checkJwt, async (req, res) => {
   const body: {
     user: {
       username: string;
-      firstName?: string;
-      lastName?: string;
+      firstName: string;
+      lastName: string;
       email: string;
-      idCode?: string;
-      faculty?: string;
-      phoneNumber?: string;
-      gender?: string;
+      idCode: string;
+      faculty: string;
+      phoneNumber: string;
+      gender: string;
       description?: string;
       profilePicture: {
         url?: string;
         base64Image?: string;
       };
-      interestedEventTypes?: string[];
-      auth0UserId?: string;
+      interestedEventTypes: string[];
     };
   } = req.body;
 
@@ -77,9 +75,9 @@ router.post("/create", checkJwt, async (req, res) => {
     const auth0id = getAuth0Id(token!);
 
     // get event types ids
-    const eventTypes = body.user.interestedEventTypes
-      ? await getEventTypesFromStrings(body.user.interestedEventTypes)
-      : [];
+    const eventTypes = await getEventTypesFromStrings(
+      body.user.interestedEventTypes
+    );
 
     const eventTypeIds =
       eventTypes.length > 0
@@ -360,8 +358,11 @@ router.post("/:id/edit", checkJwt, async (req, res) => {
       phoneNumber: body.user.phoneNumber,
       gender: body.user.gender,
       description: body.user.description,
-      interestedEventTypes: eventTypeIds,
     };
+
+    if (eventTypeIds.length > 0) {
+      userJson.interestedEventTypes = eventTypeIds;
+    }
 
     if (profilePictureUrl) {
       userJson.profilePictureUrl = profilePictureUrl;

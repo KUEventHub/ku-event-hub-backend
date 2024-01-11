@@ -71,6 +71,8 @@ router.get("/", async (req, res) => {
 });
 
 /**
+ * i'll finish this tomorrow
+ * 
  * @route post /api/events/create
  */
 router.post("/create", checkJwt, checkAdminRole, async (req, res) => {

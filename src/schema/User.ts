@@ -29,15 +29,15 @@ const schema = new Schema({
     type: String,
     required: [true, getMissingAttributeString("username")],
     min: [4, getMinimumLengthString("username", 4)],
-    max: [15, getMaximumLengthString("username", 15)],
+    max: [20, getMaximumLengthString("username", 20)],
   },
   firstName: {
     type: String,
-    default: "",
+    required: [true, getMissingAttributeString("firstName")],
   },
   lastName: {
     type: String,
-    default: "",
+    required: [true, getMissingAttributeString("lastName")],
   },
   email: {
     type: String,
@@ -46,24 +46,24 @@ const schema = new Schema({
   },
   idCode: {
     type: String,
-    default: "",
+    required: [true, getMissingAttributeString("idCode")],
   },
   faculty: {
     type: String,
-    default: "none",
+    required: [true, getMissingAttributeString("faculty")],
     enum: {
       // might need to move this to another table
-      values: [...FACULTY_LIST, "none", "other"],
+      values: [...FACULTY_LIST, "other"],
       message: getInvalidValueString("faculty"),
     },
   },
   phoneNumber: {
     type: String,
-    default: "",
+    required: [true, getMissingAttributeString("phoneNumber")],
   },
   gender: {
     type: String,
-    default: "other",
+    required: [true, getMissingAttributeString("gender")],
     enum: {
       // might need to move this to another table
       values: ["male", "female", "other"],

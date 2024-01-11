@@ -9,10 +9,11 @@
 
 #### users `/api/users`
 
-- `/api/users/create` creates a user
+- `/api/users/create` create user
 - `/api/users/:id` fetch user information
 - `/api/users/:id/edit` edit user information
 
 #### events `/api/events`
 
 - `/api/events/` fetch events
+- `/api/events/create` create event (don't use)
