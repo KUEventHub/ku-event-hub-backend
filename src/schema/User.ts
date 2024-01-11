@@ -21,6 +21,10 @@ const schema = new Schema({
     type: String,
     required: [true, getMissingAttributeString("auth0UserId")],
   },
+  firebaseSalt: {
+    type: String,
+    required: [true, getMissingAttributeString("firebaseSalt")],
+  },
   username: {
     type: String,
     required: [true, getMissingAttributeString("username")],

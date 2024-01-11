@@ -12,7 +12,6 @@
 - `/api/users/create` creates a user
 - `/api/users/:id` fetch user information
 - `/api/users/:id/edit` edit user information
-- `/api/users/:id/upload-profile-picture` upload user profile picture (not finished)
 
 #### events `/api/events`
 

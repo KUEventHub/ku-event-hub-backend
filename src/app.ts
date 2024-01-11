@@ -12,11 +12,14 @@ import "./schema/Participation.ts";
 import "./schema/BanLog.ts";
 import "./schema/FriendRequest.ts";
 
+// init firebase
+import "./services/firebase.ts";
+
 const app = express();
 const port = process.env.PORT;
 
 // parse body as json
-app.use(express.json());
+app.use(express.json({ limit: "5MB" }));
 
 // users route
 app.use("/api/users", userRouter);

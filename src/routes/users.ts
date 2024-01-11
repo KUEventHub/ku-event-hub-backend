@@ -7,7 +7,12 @@ import {
   getAuth0Id,
 } from "../services/users.ts";
 import { getEventTypesFromStrings } from "../services/eventtypes.ts";
-import { registerUser, signOut } from "../services/firebase.ts";
+import {
+  registerUser,
+  signIn,
+  signOut,
+  uploadProfilePicture,
+} from "../services/firebase.ts";
 import { encryptPassword } from "../services/bcrypt.ts";
 
 const router = Router();
@@ -15,7 +20,8 @@ const router = Router();
 /**
  * @route post /api/users/create
  * creates a new user, saves it to the database.
- * also creates a new user in firebase
+ * also creates a new user in firebase.
+ * base64img has a size limit of ~5mb
  *
  * requirements:
  * - authorization: Bearer <access_token>
@@ -30,7 +36,10 @@ const router = Router();
         phoneNumber?: string;
         gender?: string;
         description?: string;
-        profilePictureUrl: string;
+        profilePicture: {
+          url?: string;
+          base64Image?: string;
+        };
         interestedEventTypes?: string[];
         auth0UserId: string;
       };
@@ -53,7 +62,10 @@ router.post("/create", checkJwt, async (req, res) => {
       phoneNumber?: string;
       gender?: string;
       description?: string;
-      profilePictureUrl: string;
+      profilePicture: {
+        url?: string;
+        base64Image?: string;
+      };
       interestedEventTypes?: string[];
       auth0UserId?: string;
     };
@@ -84,22 +96,47 @@ router.post("/create", checkJwt, async (req, res) => {
       phoneNumber: body.user.phoneNumber,
       gender: body.user.gender,
       description: body.user.description,
-      profilePictureUrl: body.user.profilePictureUrl,
+      profilePictureUrl: "",
       interestedEventTypes: eventTypeIds,
       auth0UserId: auth0id,
+      firebaseSalt: "",
     };
 
-    console.log(userJson);
+    // get user's password for firebase
+    const passwordObject = await encryptPassword(auth0id);
+
+    // save salt in user
+    userJson.firebaseSalt = passwordObject.salt;
+
+    // register user to firebase
+    await registerUser(userJson.email, passwordObject.password);
+
+    let profilePictureUrl = "";
+
+    // if profile picture is sent as url, use that
+    if (body.user.profilePicture.url) {
+      profilePictureUrl = body.user.profilePicture.url;
+    } else if (body.user.profilePicture.base64Image) {
+      // if profile picture is sent as base64 encoded image
+      // upload it to firebase and use that
+      profilePictureUrl = await uploadProfilePicture(
+        auth0id,
+        body.user.profilePicture.base64Image
+      );
+    } else {
+      res.status(400).send({
+        error: "Profile picture not found",
+      });
+      return;
+    }
+
+    await signOut();
+
+    // save profile picture url in user
+    userJson.profilePictureUrl = profilePictureUrl;
 
     // create a user from the body
     const user = await createUser(userJson);
-
-    // register user to firebase
-    // also signs out right after registering
-    // because we don't need to keep the user logged in
-    const firebasePassword = await encryptPassword(auth0id);
-    await registerUser(userJson.email, firebasePassword);
-    await signOut();
 
     res.status(200).send({
       message: "User created successfully",
@@ -215,6 +252,7 @@ router.get("/:id", async (req, res) => {
  * @route post /api/users/:id/edit
  * :id = user's _id
  * finds a user in the database and edits it
+ * base64img has a size limit of ~5mb
  *
  * requirements:
  * - authorization: Bearer <access_token>
@@ -228,6 +266,10 @@ router.get("/:id", async (req, res) => {
         phoneNumber?: string;
         gender?: string;
         description?: string;
+        profilePicture?: {
+          url?: string;
+          base64Image?: string;
+        };
         interestedEventTypes?: string[];
       };
     }
@@ -248,6 +290,10 @@ router.post("/:id/edit", checkJwt, async (req, res) => {
       idCode?: string;
       faculty?: string;
       phoneNumber?: string;
+      profilePicture?: {
+        url?: string;
+        base64Image?: string;
+      };
       gender?: string;
       description?: string;
       interestedEventTypes?: string[];
@@ -286,7 +332,26 @@ router.post("/:id/edit", checkJwt, async (req, res) => {
         ? eventTypes.map((eventType) => eventType!._id)
         : [];
 
-    const userJson = {
+    let profilePictureUrl: string | undefined = undefined;
+    // if profile picture is sent as url, use that
+    if (body.user.profilePicture?.url) {
+      profilePictureUrl = body.user.profilePicture.url;
+    } else if (body.user.profilePicture?.base64Image) {
+      // if profile picture is sent as base64 encoded image
+      // upload it to firebase and use that
+      const passwordObj = await encryptPassword(
+        auth0id,
+        auth0user.firebaseSalt
+      );
+      await signIn(auth0user.email, passwordObj.password);
+      profilePictureUrl = await uploadProfilePicture(
+        auth0id,
+        body.user.profilePicture.base64Image
+      );
+      await signOut();
+    }
+
+    const userJson: any = {
       username: body.user.username,
       firstName: body.user.firstName,
       lastName: body.user.lastName,
@@ -297,6 +362,10 @@ router.post("/:id/edit", checkJwt, async (req, res) => {
       description: body.user.description,
       interestedEventTypes: eventTypeIds,
     };
+
+    if (profilePictureUrl) {
+      userJson.profilePictureUrl = profilePictureUrl;
+    }
 
     await auth0user.updateOne(userJson);
 
@@ -310,60 +379,8 @@ router.post("/:id/edit", checkJwt, async (req, res) => {
   }
 });
 
-/**
- * @route post /api/users/:id/upload-profile-picture
- * :id = user's _id
- * finds a user in the database and uploads a profile picture,
- * then returns the link to the picture.
- * also updates the user's profile picture url in the database
- *
- * not finished though
- */
-router.post("/:id/upload-profile-picture", checkJwt, async (req, res) => {
-  // get id from url params
-  const id = req.params.id;
-
-  const body: {
-    user: {
-      profilePicture: string;
-    };
-  } = req.body;
-
-  try {
-    // get user's auth0 id
-    const token = req.get("Authorization");
-    const auth0id = getAuth0Id(token!);
-    const auth0user = await findUserWithAuth0Id(auth0id);
-
-    // if there's no user with auth0 id, respond with error
-    if (!auth0user) {
-      res.status(404).send({
-        error: "User not found",
-      });
-      return;
-    }
-
-    // if user is not the same as the user in the url, respond with error
-    if (auth0user._id.toString() !== id) {
-      res.status(401).send({
-        error: "Unauthorized",
-      });
-      return;
-    }
-
-    // todo: login firebase to get authorization
-    // upload profile picture to firebase
-    // get the profile picture's link
-
-    res.status(200).send({
-      message: "User updated successfully",
-      profilePictureUrl: body.user.profilePicture,
-    });
-  } catch (e: any) {
-    // handle errors
-    console.error(e);
-    res.status(400).send(e);
-  }
-});
+// simplied user (only checks if user is registered)
+// then sends back the info for the user menu
+// probably picture email username
 
 export { router as userRouter };

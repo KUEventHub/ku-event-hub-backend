@@ -40,6 +40,7 @@ const schema = new Schema({
     default: "",
   },
   isActive: {
+    // whether this event is active (can be participated)
     type: Boolean,
     default: true,
   },
@@ -70,14 +71,14 @@ const schema = new Schema({
     // users that joined this event
     // `Participation` ObjectId
     type: Array<mongoose.Types.ObjectId>,
-    default: null,
+    default: [],
     ref: TABLES.PARTICIPATION,
   },
   eventTypes: {
     // event types of this event
     // `EventType` ObjectId
     type: Array<mongoose.Types.ObjectId>,
-    default: null,
+    default: [],
     ref: TABLES.EVENT_TYPE,
   },
 });
