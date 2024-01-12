@@ -30,6 +30,7 @@ const router = Router();
  * {
       pageNumber,
       pageSize,
+      noPages,
       events,
     }
  */
@@ -62,9 +63,12 @@ router.get("/", async (req, res) => {
       },
     });
 
+    const noPages = Math.ceil(events.length / _pageSize);
+
     res.status(200).send({
       _pageNumber,
       _pageSize,
+      noPages,
       events,
     });
   } catch (e: any) {
@@ -137,6 +141,13 @@ router.post("/create", checkJwt, checkAdminRole, async (req, res) => {
     const startTime = new Date(body.event.startTime);
     const endTime = new Date(body.event.endTime);
 
+    const eventTypes = await getEventTypesFromStrings(body.event.eventTypes);
+
+    const eventTypesIds =
+      eventTypes.length > 0
+        ? eventTypes.map((eventType) => eventType!._id)
+        : [];
+
     const eventJson: any = {
       name: body.event.name,
       activityHours: body.event.activityHours,
@@ -145,7 +156,7 @@ router.post("/create", checkJwt, checkAdminRole, async (req, res) => {
       endTime: endTime,
       location: body.event.location,
       description: body.event.description,
-      eventTypes: await getEventTypesFromStrings(body.event.eventTypes),
+      eventTypes: eventTypesIds,
       createdBy: user._id,
     };
 
