@@ -5,6 +5,7 @@ import {
   findUserWithId,
   findUserWithAuth0Id,
   getAuth0Id,
+  findAndPopulateUser,
 } from "../services/users.ts";
 import { getEventTypesFromStrings } from "../services/eventtypes.ts";
 import {
@@ -45,8 +46,10 @@ const router = Router();
     }
  *
  * results:
- * - 200: {message, id}
- * - 400: {error}
+ * {
+      message: "User created successfully",
+      id: string,
+    }
  */
 router.post("/create", checkJwt, async (req, res) => {
   // user information is sent in the body as json
@@ -149,16 +152,103 @@ router.post("/create", checkJwt, async (req, res) => {
 });
 
 /**
+ * @route get /api/users/me
+ * fetch sent user's information via access token
+ *
+ * requirements:
+ * - authorization: Bearer <access_token>
+ *
+ * results:
+ * {
+      message: "User found successfully",
+      user: {
+        _id: string;
+        username: string;
+        email: string;
+        profilePictureUrl: string;
+      },
+    }
+ */
+router.get("/me", checkJwt, async (req, res) => {
+  try {
+    const token = req.get("Authorization");
+    const auth0id = getAuth0Id(token!);
+    const user = await findUserWithAuth0Id(auth0id);
+
+
+    if (!user) {
+      res.status(404).send({
+        error: "User not found",
+      });
+      return;
+    }
+
+    const userObj = {
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      profilePictureUrl: user.profilePictureUrl,
+    };
+
+    res.status(200).send({
+      message: "User found successfully",
+      user: userObj,
+    });
+  } catch (e: any) {
+    // handle errors
+    console.error(e);
+    res.status(400).send(e);
+  }
+});
+
+/**
  * @route get /api/users/:id
  *
  * :id = user's _id
  * finds a user in the database and returns information
  * based on user's privacy settings
+ * 
+ * requirements:
+ * - params: {
+      id: string;
+    }
  *
  * results:
- * - 200: {message, user: {username, profilePictureUrl, information, events, friends}}
- * (information, events, friends has field `show`)
- * that is either true or false depending on privacy settings
+ * {
+      message: "User found successfully",
+      user: {
+        _id: string;
+        username: string;
+        profilePictureUrl: string;
+        information: {
+          show: boolean;
+          // if show is true, these fields are visible
+          firstName: string;
+          lastName: string;
+          email: string;
+          idCode: string;
+          faculty: string;
+          gender: "other" | "male" | "female";
+          phoneNumber: string;
+          // if show is false, this field is visible
+          message: "User information is private"";
+        },
+        events: {
+          show: boolean;
+          // if show is true, this field is visible
+          events: Event[];
+          // if show is false, this field is visible
+          message: "User events are private"";
+        },
+        friends: {
+          show: boolean;
+          // if show is true, this field is visible
+          friends: User[];
+          // if show is false, this field is visible
+          message: "User friends are private"";
+        },
+      }
+    }
  */
 router.get("/:id", async (req, res) => {
   // get id from url params
@@ -180,13 +270,10 @@ router.get("/:id", async (req, res) => {
     const showEvents = user.showEvents;
     const showFriends = user.showFriends;
 
-    if (showEvents) {
-      await user.populate("joinedEvents");
-    }
-
-    if (showFriends) {
-      await user.populate("friends");
-    }
+    const populatedUser = await findAndPopulateUser(id, {
+      joinedEvents: showEvents,
+      friends: showFriends,
+    });
 
     const userObj = {
       // fields that are always visible
@@ -216,7 +303,7 @@ router.get("/:id", async (req, res) => {
       events: showEvents
         ? {
             show: true,
-            events: user.joinedEvents,
+            events: populatedUser.joinedEvents,
           }
         : {
             show: false,
@@ -227,7 +314,7 @@ router.get("/:id", async (req, res) => {
       friends: showFriends
         ? {
             show: true,
-            friends: user.friends,
+            friends: populatedUser.friends,
           }
         : {
             show: false,
@@ -274,7 +361,9 @@ router.get("/:id", async (req, res) => {
  * - user has to be the same as the user in the url
  *
  * results:
- * - 200: {message}
+ * {
+      message: "User updated successfully",
+    }
  */
 router.post("/:id/edit", checkJwt, async (req, res) => {
   // get id from url params
@@ -379,9 +468,5 @@ router.post("/:id/edit", checkJwt, async (req, res) => {
     res.status(400).send(e);
   }
 });
-
-// simplied user (only checks if user is registered)
-// then sends back the info for the user menu
-// probably picture email username
 
 export { router as userRouter };

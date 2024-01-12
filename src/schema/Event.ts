@@ -12,7 +12,7 @@ const schema = new Schema({
   },
   imageUrl: {
     type: String,
-    required: [true, getMissingAttributeString("imageUrl")],
+    default: "",
   },
   activityHours: {
     type: Number,

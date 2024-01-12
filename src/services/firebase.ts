@@ -92,3 +92,22 @@ export async function uploadProfilePicture(
   const pictureUrl = await getDownloadURL(profilePictureRef);
   return pictureUrl;
 }
+
+/**
+ * Uploads a event picture to firebase storage and returns the url of the uploaded image.
+ * Needs user to be logged in before calling.
+ * 
+ * @param id event id
+ * @param base64Image base64 encoded image
+ * @returns url of the uploaded image
+ */
+export async function uploadEventPicture(
+  id: string,
+  base64Image: string
+) {
+  const eventPictureRef = ref(storage, `event-pictures/${id}.png`);
+  await uploadString(eventPictureRef, base64Image, "base64");
+
+  const pictureUrl = await getDownloadURL(eventPictureRef);
+  return pictureUrl;
+}

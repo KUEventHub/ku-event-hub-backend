@@ -76,6 +76,7 @@ export function getAuth0Id(accessToken: string) {
 
 /**
  * Updates a user in the database and returns it.
+ *
  * @param id user id (ObjectId)
  * @param user user information
  * @returns `User` object
@@ -92,11 +93,60 @@ export async function updateUser(
     gender?: string;
     description?: string;
     profilePictureUrl?: string;
-    interestedEventTypes?: string[];
+    showFriends?: boolean;
+    showEvents?: boolean;
+    showUserInformation?: boolean;
+    interestedEventTypes?: ObjectId[];
+    joinedEvents?: ObjectId[];
+    friends?: ObjectId[];
+    ban?: ObjectId;
   }
 ) {
+  const userJson = {
+    ...user,
+    updatedAt: Date.now(),
+  };
   // find a user with id
-  const foundUser = await User.findByIdAndUpdate(id, user);
+  const foundUser = await User.findByIdAndUpdate(id, userJson);
 
   return foundUser;
+}
+
+/**
+ * Finds a user in the database and returns it.
+ * Populates the user with the given options.
+ * 
+ * @param id user id
+ * @param options options for populating the user
+ * @returns `User` object (populater as per option)
+ */
+export async function findAndPopulateUser(
+  id: string,
+  options: {
+    interestedEventTypes?: boolean;
+    joinedEvents?: boolean;
+    friends?: boolean;
+    ban?: boolean;
+  }
+) {
+  const user = await findUserWithId(id);
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  if (options.interestedEventTypes) {
+    await user.populate("interestedEventTypes");
+  }
+  if (options.joinedEvents) {
+    await user.populate("joinedEvents");
+  }
+  if (options.friends) {
+    await user.populate("friends");
+  }
+  if (options.ban) {
+    await user.populate("ban");
+  }
+
+  return user;
 }

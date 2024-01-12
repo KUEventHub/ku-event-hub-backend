@@ -19,7 +19,7 @@ const app = express();
 const port = process.env.PORT;
 
 // parse body as json
-app.use(express.json({ limit: "5MB" }));
+app.use(express.json({ limit: "10MB" }));
 
 // users route
 app.use("/api/users", userRouter);

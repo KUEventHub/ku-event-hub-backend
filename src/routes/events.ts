@@ -3,64 +3,68 @@ import Event from "../schema/Event.ts";
 import { checkAdminRole, checkJwt } from "../middleware/auth.ts";
 import { getEventTypesFromStrings } from "../services/eventtypes.ts";
 import { findUserWithAuth0Id, getAuth0Id } from "../services/users.ts";
+import { encryptPassword } from "../services/bcrypt.ts";
+import { signIn, signOut, uploadEventPicture } from "../services/firebase.ts";
+import { createEvent, getEvents, updateEvent } from "../services/events.ts";
 
 const router = Router();
 
 /**
  * @route get /api/events
- * get all events.
- * if search is provided, only events with names that contain the search string are returned.
- * if eventTypes is provided, only events with eventTypes that contain the eventTypes string are returned.
- * yes, you can provide both search and eventTypes.
- * if page is provided, only events in that page are returned.
+ * get all events. optional filter.
  *
  * requirements:
  * - body: {
-      search?: string;
-      eventTypes?: string[];
-      page: number;
+      filter?: {
+        pageNumber?: number;
+        pageSize?: number;
+        event?: {
+          name?: string;
+          eventTypes?: string[];
+          isActive?: boolean;
+        };
+      };
     }
  *
  * results:
- * - 200: {
+ * {
       pageNumber,
       pageSize,
       events,
     }
- * - 400: {error}
  */
 router.get("/", async (req, res) => {
   const body: {
-    search?: string;
-    eventTypes?: string[];
-    page?: number;
+    filter?: {
+      pageNumber?: number;
+      pageSize?: number;
+      event?: {
+        name?: string;
+        eventTypes?: string[];
+        isActive?: boolean;
+      };
+    };
   } = req.body;
 
-  const pageSize = 20;
-  const pageNumber = body.page ? body.page : 1;
+  const _pageNumber =
+    body.filter && body.filter.pageNumber ? body.filter.pageNumber : 1;
+  const _pageSize =
+    body.filter && body.filter.pageSize ? body.filter.pageSize : 20;
 
   try {
-    const events = await Event.aggregate([
-      {
-        $match: {
-          name: {
-            $regex: body.search ? body.search : "",
-          },
-          eventTypes: {
-            $in: body.eventTypes ? ["eventTypes", body.eventTypes] : [],
-          },
-        },
+    const events = await getEvents({
+      pageNumber: _pageNumber,
+      pageSize: _pageSize,
+      event: {
+        name: body.filter && body.filter.event?.name,
+        eventTypes: body.filter && body.filter.event?.eventTypes,
+        isActive: body.filter && body.filter.event?.isActive,
       },
-      {
-        $skip: (pageNumber - 1) * pageSize,
-      },
-      {
-        $limit: pageSize,
-      },
-    ]);
+    });
+
     res.status(200).send({
-      pageNumber,
-      pageSize,
+      _pageNumber,
+      _pageSize,
       events,
     });
   } catch (e: any) {
@@ -71,27 +75,54 @@ router.get("/", async (req, res) => {
 });
 
 /**
- * i'll finish this tomorrow
- * 
  * @route post /api/events/create
+ * create an event, saves it to the database
+ * 
+ * requirements:
+ * - authorization: Bearer <access_token>
+ * - auth0 role: Admin
+ * - body: {
+      event: {
+        name: string;
+        activityHours: number;
+        totalSeats: number;
+        startTime: number;
+        endTime: number;
+        location: string;
+        description?: string;
+        eventTypes: string[];
+        image: {
+          url?: string;
+          base64Image?: string;
+        };
+      };
+    }
+ * results:
+ * {
+      message: "Event created successfully",
+      id: string,
+    }   
  */
 router.post("/create", checkJwt, checkAdminRole, async (req, res) => {
   const body: {
     event: {
       name: string;
-      imageUrl: string;
       activityHours: number;
       totalSeats: number;
-      startTime: Date;
-      endTime: Date;
+      startTime: number;
+      endTime: number;
       location: string;
       description?: string;
-      eventTypes?: string[];
+      eventTypes: string[];
+      image: {
+        url?: string;
+        base64Image?: string;
+      };
     };
   } = req.body;
 
   try {
-    // get user
+    // get user that sent the request
     const token = req.get("Authorization");
     const auth0id = getAuth0Id(token!);
     const user = await findUserWithAuth0Id(auth0id);
@@ -103,20 +134,50 @@ router.post("/create", checkJwt, checkAdminRole, async (req, res) => {
       return;
     }
 
-    const eventJson = {
+    const startTime = new Date(body.event.startTime);
+    const endTime = new Date(body.event.endTime);
+
+    const eventJson: any = {
       name: body.event.name,
-      imageUrl: body.event.imageUrl,
       activityHours: body.event.activityHours,
       totalSeats: body.event.totalSeats,
-      startTime: body.event.startTime,
-      endTime: body.event.endTime,
+      startTime: startTime,
+      endTime: endTime,
       location: body.event.location,
       description: body.event.description,
-      eventTypes: body.event.eventTypes
-        ? await getEventTypesFromStrings(body.event.eventTypes)
-        : [],
+      eventTypes: await getEventTypesFromStrings(body.event.eventTypes),
       createdBy: user._id,
     };
+
+    const event = await createEvent(eventJson);
+
+    let imageUrl: string | undefined = undefined;
+    // if profile picture is sent as url, use that
+    if (body.event.image.url) {
+      imageUrl = body.event.image.url;
+    } else if (body.event.image.base64Image) {
+      // if profile picture is sent as base64 encoded image
+      // upload it to firebase and use that
+      const passwordObj = await encryptPassword(auth0id, user.firebaseSalt);
+      await signIn(user.email, passwordObj.password);
+      imageUrl = await uploadEventPicture(
+        event._id.toString(),
+        body.event.image.base64Image
+      );
+      await signOut();
+    }
+
+    // if there is an image url, add it to the event
+    if (imageUrl) {
+      await updateEvent(event._id.toString(), {
+        imageUrl: imageUrl,
+      });
+    }
+
+    res.status(200).send({
+      message: "Event created successfully",
+      id: event._id,
+    });
   } catch (e: any) {
     // handle error
     console.error(e);
