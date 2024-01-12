@@ -469,4 +469,15 @@ router.post("/:id/edit", checkJwt, async (req, res) => {
   }
 });
 
+// list users
+// login log user
+// sort event (user)
+// - most recently created
+// - most recently edited
+// - most recent start date
+// - most participants percentage
+// sort user
+// participate
+// add friend
+
 export { router as userRouter };

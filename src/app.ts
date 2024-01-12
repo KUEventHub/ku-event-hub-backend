@@ -3,6 +3,7 @@ import "./services/mongoose.ts"; // connect to MongoDB and Mongoose
 import "dotenv/config"; // config from .env
 import { userRouter } from "./routes/users.ts";
 import { eventRouter } from "./routes/events.ts";
+import cors from "cors";
 
 // init models and schemas
 import "./schema/User.ts";
@@ -18,6 +19,8 @@ import "./services/firebase.ts";
 const app = express();
 const port = process.env.PORT;
 
+// use cors
+app.use(cors());
 // parse body as json
 app.use(express.json({ limit: "10MB" }));
 

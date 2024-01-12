@@ -1,5 +1,4 @@
 import { Router } from "express";
-import Event from "../schema/Event.ts";
 import { checkAdminRole, checkJwt } from "../middleware/auth.ts";
 import { getEventTypesFromStrings } from "../services/eventtypes.ts";
 import { findUserWithAuth0Id, getAuth0Id } from "../services/users.ts";
@@ -147,6 +146,13 @@ router.post("/create", checkJwt, checkAdminRole, async (req, res) => {
       eventTypes.length > 0
         ? eventTypes.map((eventType) => eventType!._id)
         : [];
+
+    if (eventTypesIds.length <= 0) {
+      res.status(400).send({
+        error: "no event types found",
+      });
+      return;
+    }
 
     const eventJson: any = {
       name: body.event.name,

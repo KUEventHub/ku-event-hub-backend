@@ -48,8 +48,6 @@ export async function getEvents(filter: {
     isActive?: boolean;
   };
 }) {
-  console.log(Date.now());
-
   const filterJson: any = {};
 
   // if there is a filter for event name
