@@ -80,6 +80,9 @@ export const checkAdminRole: RequestHandler = async (req, res, next) => {
   next();
 };
 
+/**
+ * Middleware: checks if the user is the same user in the url.
+ */
 export const checkSameUser: RequestHandler = async (req, res, next) => {
   // get id from url params
   const id = req.params.id;
