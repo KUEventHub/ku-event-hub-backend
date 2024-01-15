@@ -6,6 +6,7 @@ import {
   findUserWithAuth0Id,
   getAuth0Id,
   findAndPopulateUser,
+  updateUser,
 } from "../services/users.ts";
 import { getEventTypesFromStrings } from "../services/eventtypes.ts";
 import {
@@ -103,11 +104,11 @@ router.post("/create", checkJwt, async (req, res) => {
       firebaseSalt: "",
     };
 
+    // create a user from the body
+    const user = await createUser(userJson);
+
     // get user's password for firebase
     const passwordObject = await encryptPassword(auth0id);
-
-    // save salt in user
-    userJson.firebaseSalt = passwordObject.salt;
 
     // register user to firebase
     await registerUser(userJson.email, passwordObject.password);
@@ -133,11 +134,11 @@ router.post("/create", checkJwt, async (req, res) => {
 
     await signOut();
 
-    // save profile picture url in user
-    userJson.profilePictureUrl = profilePictureUrl;
-
-    // create a user from the body
-    const user = await createUser(userJson);
+    // update user
+    await updateUser(user._id.toString(), {
+      firebaseSalt: passwordObject.salt,
+      profilePictureUrl: profilePictureUrl,
+    });
 
     res.status(200).send({
       message: "User created successfully",
@@ -174,7 +175,6 @@ router.get("/me", checkJwt, async (req, res) => {
     const token = req.get("Authorization");
     const auth0id = getAuth0Id(token!);
     const user = await findUserWithAuth0Id(auth0id);
-
 
     if (!user) {
       res.status(404).send({

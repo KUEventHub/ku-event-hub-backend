@@ -23,7 +23,7 @@ const schema = new Schema({
   },
   firebaseSalt: {
     type: String,
-    required: [true, getMissingAttributeString("firebaseSalt")],
+    default: "",
   },
   username: {
     type: String,
@@ -77,7 +77,7 @@ const schema = new Schema({
   profilePictureUrl: {
     // profile picture url
     type: String,
-    required: [true, getMissingAttributeString("profilePicture")],
+    default: "",
   },
   createdAt: {
     type: Date,

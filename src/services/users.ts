@@ -10,17 +10,17 @@ import { ObjectId } from "mongodb";
  */
 export async function createUser(user: {
   username: string;
-  firstName?: string;
-  lastName?: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  idCode?: string;
-  faculty?: string;
-  phoneNumber?: string;
-  gender?: string;
+  idCode: string;
+  faculty: string;
+  phoneNumber: string;
+  gender: string;
   description?: string;
-  profilePictureUrl: string;
+  profilePictureUrl?: string;
   interestedEventTypes?: ObjectId[];
-  auth0UserId?: string;
+  auth0UserId: string;
 }) {
   // create a new user object
   const createdUser = new User(user);
@@ -100,6 +100,7 @@ export async function updateUser(
     joinedEvents?: ObjectId[];
     friends?: ObjectId[];
     ban?: ObjectId;
+    firebaseSalt?: string;
   }
 ) {
   const userJson = {
@@ -115,7 +116,7 @@ export async function updateUser(
 /**
  * Finds a user in the database and returns it.
  * Populates the user with the given options.
- * 
+ *
  * @param id user id
  * @param options options for populating the user
  * @returns `User` object (populater as per option)
