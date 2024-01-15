@@ -5,6 +5,7 @@ import { findUserWithAuth0Id, getAuth0Id } from "../services/users.ts";
 import { encryptPassword } from "../services/bcrypt.ts";
 import { signIn, signOut, uploadEventPicture } from "../services/firebase.ts";
 import { createEvent, getEvents, updateEvent } from "../services/events.ts";
+import { EVENT_SORT_TYPES } from "../helper/constants.ts";
 
 const router = Router();
 
@@ -18,6 +19,7 @@ const router = Router();
  *    pageSize: number;
  *    eventName?: string;
  *    eventType?: string;
+ *    sortType?: number;
  *  }
  *
  * results:
@@ -38,6 +40,9 @@ router.get("/", async (req, res) => {
 
   const eventName = req.query.eventName?.toString();
   const eventType = req.query.eventType?.toString();
+  const sortType = req.query.sortType
+    ? parseInt(req.query.sortType.toString())
+    : EVENT_SORT_TYPES.MOST_RECENTLY_CREATED;
 
   try {
     const events = await getEvents({
@@ -47,6 +52,7 @@ router.get("/", async (req, res) => {
         name: eventName,
         eventTypes: eventType ? [eventType] : [],
       },
+      sortType,
     });
 
     const noPages = Math.ceil(events.length / pageSize);

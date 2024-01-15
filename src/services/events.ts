@@ -1,6 +1,7 @@
 import { ObjectId } from "mongodb";
 import Event from "../schema/Event.ts";
 import { getEventTypesFromStrings } from "./eventtypes.ts";
+import { EVENT_SORT_TYPES } from "../helper/constants.ts";
 
 /**
  * Creates a new event, saves it to the database
@@ -46,6 +47,7 @@ export async function getEvents(filter: {
     name?: string;
     eventTypes?: string[];
   };
+  sortType: number;
 }) {
   const filterJson: any = {};
 
@@ -66,8 +68,6 @@ export async function getEvents(filter: {
     if (eventTypes.length > 0) {
       const eventTypesIds = eventTypes.map((eventType) => eventType!._id);
 
-      console.log(eventTypes);
-
       filterJson.$match = {
         ...filterJson.$match,
         eventTypes: {
@@ -82,6 +82,39 @@ export async function getEvents(filter: {
   // if the filter json is empty, don't include it in aggregate
   if (filterJson.$match) {
     aggregate.push(filterJson);
+  }
+
+  // add joined users count
+  aggregate.push({
+    $addFields: {
+      joinedUsersCount: { $size: "$joinedUsers" },
+    },
+  });
+
+  switch (filter.sortType) {
+    case EVENT_SORT_TYPES.MOST_RECENTLY_CREATED:
+      aggregate.push({
+        $sort: {
+          createdAt: -1,
+        },
+      });
+      break;
+    case EVENT_SORT_TYPES.MOST_RECENT_START_DATE:
+      aggregate.push({
+        $sort: {
+          startTime: -1,
+        },
+      });
+      break;
+    case EVENT_SORT_TYPES.MOST_PARTICIPANTS:
+      aggregate.push({
+        $sort: {
+          joinedUsers: -1,
+        },
+      });
+      break;
+    default:
+      throw new Error("Invalid sort type");
   }
 
   aggregate.push({
