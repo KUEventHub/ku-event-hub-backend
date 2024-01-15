@@ -13,17 +13,12 @@ const router = Router();
  * get all events. optional filter.
  *
  * requirements:
- * - body: {
-      filter?: {
-        pageNumber?: number;
-        pageSize?: number;
-        event?: {
-          name?: string;
-          eventTypes?: string[];
-          isActive?: boolean;
-        };
-      };
-    }
+ * - params: {
+ *    pageNumber: number;
+ *    pageSize: number;
+ *    eventName?: string;
+ *    eventType?: string;
+ *  }
  *
  * results:
  * {
@@ -34,39 +29,31 @@ const router = Router();
     }
  */
 router.get("/", async (req, res) => {
-  const body: {
-    filter?: {
-      pageNumber?: number;
-      pageSize?: number;
-      event?: {
-        name?: string;
-        eventTypes?: string[];
-        isActive?: boolean;
-      };
-    };
-  } = req.body;
+  const pageNumber: number = req.query.pageNumber
+    ? parseInt(req.query.pageNumber.toString())
+    : 1;
+  const pageSize: number = req.query.pageSize
+    ? parseInt(req.query.pageSize.toString())
+    : 20;
 
-  const _pageNumber =
-    body.filter && body.filter.pageNumber ? body.filter.pageNumber : 1;
-  const _pageSize =
-    body.filter && body.filter.pageSize ? body.filter.pageSize : 20;
+  const eventName = req.query.eventName?.toString();
+  const eventType = req.query.eventType?.toString();
 
   try {
     const events = await getEvents({
-      pageNumber: _pageNumber,
-      pageSize: _pageSize,
+      pageNumber,
+      pageSize,
       event: {
-        name: body.filter && body.filter.event?.name,
-        eventTypes: body.filter && body.filter.event?.eventTypes,
-        isActive: body.filter && body.filter.event?.isActive,
+        name: eventName,
+        eventTypes: eventType ? [eventType] : [],
       },
     });
 
-    const noPages = Math.ceil(events.length / _pageSize);
+    const noPages = Math.ceil(events.length / pageSize);
 
     res.status(200).send({
-      _pageNumber,
-      _pageSize,
+      pageNumber,
+      pageSize,
       noPages,
       events,
     });

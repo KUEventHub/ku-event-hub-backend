@@ -45,7 +45,6 @@ export async function getEvents(filter: {
   event: {
     name?: string;
     eventTypes?: string[];
-    isActive?: boolean;
   };
 }) {
   const filterJson: any = {};
@@ -76,13 +75,6 @@ export async function getEvents(filter: {
         },
       };
     }
-  }
-  // if there is a filter for if the event is active
-  if (filter.event.isActive) {
-    filterJson.$match = {
-      ...filterJson.$match,
-      isActive: filter.event.isActive,
-    };
   }
 
   let aggregate = [];
