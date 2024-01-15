@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { checkJwt } from "../middleware/auth.ts";
+import { checkJwt, checkSameUser } from "../middleware/auth.ts";
 import {
   createUser,
   findUserWithId,
@@ -7,6 +7,7 @@ import {
   getAuth0Id,
   findAndPopulateUser,
   updateUser,
+  getProfilePictureUrl,
 } from "../services/users.ts";
 import { getEventTypesFromStrings } from "../services/eventtypes.ts";
 import {
@@ -203,7 +204,6 @@ router.get("/me", checkJwt, async (req, res) => {
 
 /**
  * @route get /api/users/:id
- *
  * :id = user's _id
  * finds a user in the database and returns information
  * based on user's privacy settings
@@ -334,6 +334,76 @@ router.get("/:id", async (req, res) => {
 });
 
 /**
+ * @route get /api/users/:id/edit
+ * :id = user's _id
+ * finds a user in the database and fetches information
+ * to be edited
+ * 
+ * requirements:
+ * - authorization: Bearer <access_token>
+ * - user has to be the same as the user in the url
+ *
+ * results:
+ * {
+      message: "User found successfully",
+      user: {
+        profilePictureUrl: string,
+        username: string,
+        firstName: string,
+        lastName: string,
+        email: string,
+        idCode: string,
+        faculty: string,
+        phoneNumber: string,
+        gender: string,
+        interestedEventTypes: EventType[],
+        description: string,
+      },
+    }
+ */
+router.get("/:id/edit", checkJwt, checkSameUser, async (req, res) => {
+  // get id from url params
+  const id = req.params.id;
+
+  try {
+    // find a user with id
+    const user = await findUserWithId(id);
+
+    if (!user) {
+      res.status(404).send({
+        error: "User not found",
+      });
+      return;
+    }
+
+    await user.populate("interestedEventTypes");
+
+    const userObj = {
+      profilePictureUrl: user.profilePictureUrl,
+      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      idCode: user.idCode,
+      faculty: user.faculty,
+      phoneNumber: user.phoneNumber,
+      gender: user.gender,
+      interestedEventTypes: user.interestedEventTypes,
+      description: user.description,
+    };
+
+    res.status(200).send({
+      message: "User found successfully",
+      user: userObj,
+    });
+  } catch (e: any) {
+    // handle errors
+    console.error(e);
+    res.status(400).send(e);
+  }
+});
+
+/**
  * @route post /api/users/:id/edit
  * :id = user's _id
  * finds a user in the database and edits it
@@ -365,7 +435,7 @@ router.get("/:id", async (req, res) => {
       message: "User updated successfully",
     }
  */
-router.post("/:id/edit", checkJwt, async (req, res) => {
+router.post("/:id/edit", checkJwt, checkSameUser, async (req, res) => {
   // get id from url params
   const id = req.params.id;
 
@@ -388,23 +458,12 @@ router.post("/:id/edit", checkJwt, async (req, res) => {
   } = req.body;
 
   try {
-    // get user's auth0 id
-    const token = req.get("Authorization");
-    const auth0id = getAuth0Id(token!);
-    const auth0user = await findUserWithAuth0Id(auth0id);
+    // find a user with id
+    const user = await findUserWithId(id);
 
-    // if there's no user with auth0 id, respond with error
-    if (!auth0user) {
+    if (!user) {
       res.status(404).send({
         error: "User not found",
-      });
-      return;
-    }
-
-    // if user is not the same as the user in the url, respond with error
-    if (auth0user._id.toString() !== id) {
-      res.status(401).send({
-        error: "Unauthorized",
       });
       return;
     }
@@ -418,25 +477,6 @@ router.post("/:id/edit", checkJwt, async (req, res) => {
       eventTypes.length > 0
         ? eventTypes.map((eventType) => eventType!._id)
         : [];
-
-    let profilePictureUrl: string | undefined = undefined;
-    // if profile picture is sent as url, use that
-    if (body.user.profilePicture?.url) {
-      profilePictureUrl = body.user.profilePicture.url;
-    } else if (body.user.profilePicture?.base64Image) {
-      // if profile picture is sent as base64 encoded image
-      // upload it to firebase and use that
-      const passwordObj = await encryptPassword(
-        auth0id,
-        auth0user.firebaseSalt
-      );
-      await signIn(auth0user.email, passwordObj.password);
-      profilePictureUrl = await uploadProfilePicture(
-        auth0id,
-        body.user.profilePicture.base64Image
-      );
-      await signOut();
-    }
 
     const userJson: any = {
       username: body.user.username,
@@ -453,11 +493,15 @@ router.post("/:id/edit", checkJwt, async (req, res) => {
       userJson.interestedEventTypes = eventTypeIds;
     }
 
+    let profilePictureUrl = body.user.profilePicture
+      ? await getProfilePictureUrl(body.user.profilePicture, id)
+      : undefined;
+
     if (profilePictureUrl) {
       userJson.profilePictureUrl = profilePictureUrl;
     }
 
-    await auth0user.updateOne(userJson);
+    await user.updateOne(userJson);
 
     res.status(200).send({
       message: "User updated successfully",

@@ -1,7 +1,7 @@
 import { ObjectId } from "mongodb";
 import Event from "../schema/Event.ts";
 import { getEventTypesFromStrings } from "./eventtypes.ts";
-import { EVENT_SORT_TYPES } from "../helper/constants.ts";
+import { EVENT_SORT_TYPES, TABLES } from "../helper/constants.ts";
 
 /**
  * Creates a new event, saves it to the database
@@ -117,6 +117,7 @@ export async function getEvents(filter: {
       throw new Error("Invalid sort type");
   }
 
+  // add pagination
   aggregate.push({
     $skip: (filter.pageNumber - 1) * filter.pageSize,
   });
@@ -124,12 +125,19 @@ export async function getEvents(filter: {
     $limit: filter.pageSize,
   });
 
-  const events = await Event.aggregate(aggregate);
-  const populatedEvents = await Event.populate(events, {
-    path: "eventTypes",
+  // populate event types
+  aggregate.push({
+    $lookup: {
+      from: TABLES.EVENT_TYPE,
+      localField: "eventTypes",
+      foreignField: "_id",
+      as: "eventTypes",
+    },
   });
 
-  return populatedEvents;
+  const events = await Event.aggregate(aggregate);
+
+  return events;
 }
 
 /**

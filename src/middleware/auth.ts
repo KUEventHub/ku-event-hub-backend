@@ -4,6 +4,7 @@ import { RequestHandler } from "express";
 import "dotenv/config"; // config from .env
 import { jwtDecode } from "jwt-decode";
 import { ROLES } from "../helper/constants.ts";
+import { findUserWithAuth0Id, getAuth0Id } from "../services/users.ts";
 
 declare module "jwt-decode" {
   export interface JwtPayload {
@@ -24,7 +25,7 @@ export const checkJwt = auth({
 /**
  * Middleware: checks if the user has the 'user' role.
  */
-export const checkUserRole: RequestHandler = (req, res, next) => {
+export const checkUserRole: RequestHandler = async (req, res, next) => {
   // check user token
   const token = req.get("Authorization");
 
@@ -53,7 +54,7 @@ export const checkUserRole: RequestHandler = (req, res, next) => {
 /**
  * Middleware: checks if the user has the 'admin' role.
  */
-export const checkAdminRole: RequestHandler = (req, res, next) => {
+export const checkAdminRole: RequestHandler = async (req, res, next) => {
   // check user token
   const token = req.get("Authorization");
 
@@ -72,6 +73,35 @@ export const checkAdminRole: RequestHandler = (req, res, next) => {
   // return 403 Forbidden
   if (role !== ROLES.ADMIN) {
     res.status(403).send("Forbidden");
+    return;
+  }
+
+  // continue
+  next();
+};
+
+export const checkSameUser: RequestHandler = async (req, res, next) => {
+  // get id from url params
+  const id = req.params.id;
+
+  // check user token
+  const token = req.get("Authorization");
+  const auth0id = getAuth0Id(token!);
+  const auth0user = await findUserWithAuth0Id(auth0id);
+
+  // if there's no user with auth0 id, respond with error
+  if (!auth0user) {
+    res.status(404).send({
+      error: "User not found",
+    });
+    return;
+  }
+
+  // if user is not the same as the user in the url, respond with error
+  if (auth0user._id.toString() !== id) {
+    res.status(401).send({
+      error: "Unauthorized",
+    });
     return;
   }
 

@@ -1,6 +1,8 @@
 import { jwtDecode } from "jwt-decode";
 import User from "../schema/User.ts";
 import { ObjectId } from "mongodb";
+import { encryptPassword } from "./bcrypt.ts";
+import { signIn, signOut, uploadProfilePicture } from "./firebase.ts";
 
 /**
  * Creates a new user, saves it to the database
@@ -150,4 +152,38 @@ export async function findAndPopulateUser(
   }
 
   return user;
+}
+
+export async function getProfilePictureUrl(
+  profilePicture: { url?: string; base64Image?: string },
+  userId: string
+) {
+  // get user
+  const user = await findUserWithId(userId);
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  let profilePictureUrl: string | undefined = undefined;
+
+  // if profile picture is sent as url, use that
+  if (profilePicture.url) {
+    profilePictureUrl = profilePicture.url;
+  } else if (profilePicture.base64Image) {
+    // if profile picture is sent as base64 encoded image
+    // upload it to firebase and use that
+    const passwordObj = await encryptPassword(
+      user.auth0UserId,
+      user.firebaseSalt
+    );
+    await signIn(user.email, passwordObj.password);
+    profilePictureUrl = await uploadProfilePicture(
+      user.auth0UserId,
+      profilePicture.base64Image
+    );
+    await signOut();
+  }
+
+  return profilePictureUrl;
 }
