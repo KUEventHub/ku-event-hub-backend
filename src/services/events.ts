@@ -53,7 +53,7 @@ export async function getEvents(filter: {
 
   // filter out start time that was before now
   filterJson.$match = {
-    startTime: { $gt: Date.now() },
+    startTime: { $gt: new Date() },
   };
 
   // if there is a filter for event name
