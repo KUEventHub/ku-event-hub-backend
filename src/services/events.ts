@@ -51,9 +51,15 @@ export async function getEvents(filter: {
 }) {
   const filterJson: any = {};
 
+  // filter out start time that was before now
+  filterJson.$match = {
+    startTime: { $gt: Date.now() },
+  };
+
   // if there is a filter for event name
   if (filter.event.name) {
     filterJson.$match = {
+      ...filterJson.$match,
       name: {
         $regex: filter.event.name,
       },
@@ -61,8 +67,6 @@ export async function getEvents(filter: {
   }
   // if there is a filter for event types
   if (filter.event.eventTypes) {
-    console.log(filter.event.eventTypes);
-
     const eventTypes = await getEventTypesFromStrings(filter.event.eventTypes);
 
     if (eventTypes.length > 0) {
@@ -79,10 +83,7 @@ export async function getEvents(filter: {
 
   let aggregate = [];
 
-  // if the filter json is empty, don't include it in aggregate
-  if (filterJson.$match) {
-    aggregate.push(filterJson);
-  }
+  aggregate.push(filterJson);
 
   // add joined users count
   aggregate.push({
@@ -102,7 +103,7 @@ export async function getEvents(filter: {
     case EVENT_SORT_TYPES.MOST_RECENT_START_DATE:
       aggregate.push({
         $sort: {
-          startTime: -1,
+          startTime: 1,
         },
       });
       break;

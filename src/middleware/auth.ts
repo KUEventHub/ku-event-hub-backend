@@ -23,35 +23,6 @@ export const checkJwt = auth({
 });
 
 /**
- * Middleware: checks if the user has the 'user' role.
- */
-export const checkUserRole: RequestHandler = async (req, res, next) => {
-  // check user token
-  const token = req.get("Authorization");
-
-  // if user doesn't have access token
-  // return 401 Unauthorized
-  if (!token) {
-    res.status(401).send("Unauthorized");
-    return;
-  }
-
-  // decode token and get user's role
-  const decodedToken = jwtDecode(token);
-  const role = decodedToken["ku-event-hub-roles"][0]; // you can only have one role for now
-
-  // if user doesn't have the user role
-  // return 403 Forbidden
-  if (role !== ROLES.USER) {
-    res.status(403).send("Forbidden");
-    return;
-  }
-
-  // continue
-  next();
-};
-
-/**
  * Middleware: checks if the user has the 'admin' role.
  */
 export const checkAdminRole: RequestHandler = async (req, res, next) => {

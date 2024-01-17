@@ -9,14 +9,6 @@ import {
 
 const schema = new Schema({
   // user information
-  role: {
-    type: String,
-    enum: {
-      values: ["user", "admin"],
-      message: getInvalidValueString("role"),
-    },
-    default: "user",
-  },
   auth0UserId: {
     type: String,
     required: [true, getMissingAttributeString("auth0UserId")],
