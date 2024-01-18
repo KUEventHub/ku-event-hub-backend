@@ -51,10 +51,10 @@ export async function getEvents(filter: {
 }) {
   const filterJson: any = {};
 
-  // filter out start time that was before now
-  filterJson.$match = {
-    startTime: { $gt: new Date() },
-  };
+  // // filter out start time that was before now
+  // filterJson.$match = {
+  //   startTime: { $gt: new Date() },
+  // };
 
   // if there is a filter for event name
   if (filter.event.name) {
@@ -83,7 +83,10 @@ export async function getEvents(filter: {
 
   let aggregate = [];
 
-  aggregate.push(filterJson);
+  if (filterJson.$match) {
+    aggregate.push(filterJson);
+  }
+
 
   // add joined users count
   aggregate.push({
