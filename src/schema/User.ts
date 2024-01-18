@@ -1,5 +1,5 @@
 import mongoose, { Schema, model } from "mongoose";
-import { EMAIL_REGEX, FACULTY_LIST, TABLES } from "../helper/constants.ts";
+import { EMAIL_REGEX, FACULTY_LIST, ROLES, TABLES } from "../helper/constants.ts";
 import {
   getInvalidValueString,
   getMaximumLengthString,
@@ -12,6 +12,14 @@ const schema = new Schema({
   auth0UserId: {
     type: String,
     required: [true, getMissingAttributeString("auth0UserId")],
+  },
+  role: {
+    type: String,
+    enum: {
+      values: [ROLES.USER, ROLES.ADMIN],
+      message: getInvalidValueString("role"),
+    },
+    default: ROLES.USER,
   },
   firebaseSalt: {
     type: String,

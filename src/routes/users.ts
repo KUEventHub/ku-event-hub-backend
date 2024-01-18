@@ -17,6 +17,7 @@ import {
   uploadProfilePicture,
 } from "../services/firebase.ts";
 import { encryptPassword } from "../services/bcrypt.ts";
+import { ROLES } from "../helper/constants.ts";
 
 const router = Router();
 
@@ -220,6 +221,7 @@ router.get("/me", checkJwt, async (req, res) => {
         _id: string;
         username: string;
         profilePictureUrl: string;
+        role: string;
         information: {
           show: boolean;
           // if show is true, these fields are visible
@@ -280,6 +282,7 @@ router.get("/:id", async (req, res) => {
       _id: user._id,
       username: user.username,
       profilePictureUrl: user.profilePictureUrl,
+      role: user.role,
 
       // fields that are visible depending on privacy settings
       // user information
@@ -300,26 +303,28 @@ router.get("/:id", async (req, res) => {
           },
 
       // events
-      events: showEvents
-        ? {
-            show: true,
-            events: populatedUser.joinedEvents,
-          }
-        : {
-            show: false,
-            message: "User events are private",
-          },
+      events:
+        showEvents && user.role === ROLES.USER
+          ? {
+              show: true,
+              events: populatedUser.joinedEvents,
+            }
+          : {
+              show: false,
+              message: "User events are private",
+            },
 
       // friends
-      friends: showFriends
-        ? {
-            show: true,
-            friends: populatedUser.friends,
-          }
-        : {
-            show: false,
-            message: "User friends are private",
-          },
+      friends:
+        showFriends && user.role === ROLES.USER
+          ? {
+              show: true,
+              friends: populatedUser.friends,
+            }
+          : {
+              show: false,
+              message: "User friends are private",
+            },
     };
 
     res.status(200).send({
