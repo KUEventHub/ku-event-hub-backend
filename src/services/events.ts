@@ -50,7 +50,8 @@ export async function getEvents(filter: {
   sortType: number;
   sortActive: boolean;
 }) {
-  const filterJson: any = {};
+  const matchJson: any = {};
+  const sortJson: any = {};
 
   // // filter out start time that was before now
   // filterJson.$match = {
@@ -59,8 +60,8 @@ export async function getEvents(filter: {
 
   // if there is a filter for event name
   if (filter.event.name) {
-    filterJson.$match = {
-      ...filterJson.$match,
+    matchJson.$match = {
+      ...matchJson.$match,
       name: {
         $regex: filter.event.name,
       },
@@ -82,8 +83,8 @@ export async function getEvents(filter: {
         ...childEventTypesIds,
       ].flat();
 
-      filterJson.$match = {
-        ...filterJson.$match,
+      matchJson.$match = {
+        ...matchJson.$match,
         eventTypes: {
           $in: combinedEventTypesIds,
         },
@@ -92,10 +93,6 @@ export async function getEvents(filter: {
   }
 
   let aggregate = [];
-
-  if (filterJson.$match) {
-    aggregate.push(filterJson);
-  }
 
   // add joined users count
   aggregate.push({
@@ -106,32 +103,28 @@ export async function getEvents(filter: {
 
   switch (filter.sortType) {
     case EVENT_SORT_TYPES.MOST_RECENTLY_CREATED:
-      aggregate.push({
-        $sort: {
-          createdAt: -1,
-        },
-      });
+      sortJson.$sort = {
+        ...sortJson.$sort,
+        createdAt: -1,
+      };
       break;
     case EVENT_SORT_TYPES.MOST_RECENT_START_DATE:
-      aggregate.push({
-        $sort: {
-          startTime: 1,
-        },
-      });
+      sortJson.$sort = {
+        ...sortJson.$sort,
+        startTime: 1,
+      };
       break;
     case EVENT_SORT_TYPES.MOST_PARTICIPANTS:
-      aggregate.push({
-        $sort: {
-          participants: -1,
-        },
-      });
+      sortJson.$sort = {
+        ...sortJson.$sort,
+        participants: -1,
+      };
       break;
     case EVENT_SORT_TYPES.LEAST_PARTICIPANTS:
-      aggregate.push({
-        $sort: {
-          participants: 1,
-        },
-      });
+      sortJson.$sort = {
+        ...sortJson.$sort,
+        participants: 1,
+      };
       break;
     default:
       throw new Error("Invalid sort type");
@@ -139,11 +132,19 @@ export async function getEvents(filter: {
 
   // if sortActive is true, put inactive events at the bottom
   if (filter.sortActive) {
-    aggregate.push({
-      $sort: {
-        isActive: -1,
-      },
-    });
+    sortJson.$sort = {
+      ...sortJson.$sort,
+      isActive: -1,
+    };
+  }
+
+  // add match filter
+  if (matchJson.$match) {
+    aggregate.push(matchJson);
+  }
+  // add sort filter
+  if (sortJson.$sort) {
+    aggregate.push(sortJson);
   }
 
   // add pagination

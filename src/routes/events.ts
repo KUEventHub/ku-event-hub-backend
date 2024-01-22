@@ -278,4 +278,70 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+/**
+ * @route get /api/events/:id/edit
+ * :id = event's _id
+ * finds an event in the database and returns information for editing
+ * 
+ * requirements:
+ * - params: {
+      id: string;
+    }
+ * 
+ * results:
+ * {
+      message: "Event found successfully",
+      event: {
+        name: string,
+        eventTypes: EventType[],
+        startTime: Date,
+        endTime: Date,
+        location: string,
+        totalSeats: number,
+        participantsCount: number,
+        description: string,
+      }
+    }
+ */
+    router.get("/:id/edit", async (req, res) => {
+      // get id from url params
+      const id = req.params.id;
+    
+      try {
+        const event = await findAndPopulateEvent(id, {
+          participants: true,
+          eventTypes: true,
+        });
+    
+        const participants = toArray(event.participants);
+    
+        const eventJson = {
+          name: event.name,
+          eventTypes: event.eventTypes,
+          startTime: event.startTime,
+          endTime: event.endTime,
+          location: event.location,
+          totalSeats: event.totalSeats,
+          participantsCount: participants.length,
+          description: event.description,
+          participants: participants.map((participation) => {
+            return {
+              _id: participation._id,
+              name: participation.user.username,
+              profilePictureUrl: participation.user.profilePictureUrl,
+            };
+          }),
+        };
+    
+        res.status(200).send({
+          message: "Event found successfully",
+          event: eventJson,
+        });
+      } catch (e: any) {
+        // handle errors
+        console.error(e);
+        res.status(400).send(e);
+      }
+    });
+
 export { router as eventRouter };
