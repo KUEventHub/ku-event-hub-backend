@@ -20,6 +20,7 @@ const router = Router();
  *    eventName?: string;
  *    eventType?: string;
  *    sortType?: number;
+ *    sortActive?: boolean;
  *  }
  *
  * results:
@@ -44,6 +45,10 @@ router.get("/", async (req, res) => {
     ? parseInt(req.query.sortType.toString())
     : EVENT_SORT_TYPES.MOST_RECENTLY_CREATED;
 
+  const sortActive = req.query.sortActive
+    ? req.query.sortActive.toString() === "true"
+    : true;
+
   try {
     const events = await getEvents({
       pageNumber,
@@ -53,6 +58,7 @@ router.get("/", async (req, res) => {
         eventTypes: eventType ? [eventType] : [],
       },
       sortType,
+      sortActive,
     });
 
     const noPages = Math.ceil(events.length / pageSize);

@@ -48,6 +48,7 @@ export async function getEvents(filter: {
     eventTypes?: string[];
   };
   sortType: number;
+  sortActive: boolean;
 }) {
   const filterJson: any = {};
 
@@ -71,11 +72,20 @@ export async function getEvents(filter: {
 
     if (eventTypes.length > 0) {
       const eventTypesIds = eventTypes.map((eventType) => eventType!._id);
+      const childEventTypesIds = eventTypes.map(
+        (eventType) => eventType!.childTypes
+      );
+
+      // combine event types and child event types
+      const combinedEventTypesIds = [
+        ...eventTypesIds,
+        ...childEventTypesIds,
+      ].flat();
 
       filterJson.$match = {
         ...filterJson.$match,
         eventTypes: {
-          $in: eventTypesIds,
+          $in: combinedEventTypesIds,
         },
       };
     }
@@ -87,13 +97,21 @@ export async function getEvents(filter: {
     aggregate.push(filterJson);
   }
 
-
   // add joined users count
   aggregate.push({
     $addFields: {
       joinedUsersCount: { $size: "$joinedUsers" },
     },
   });
+
+  // if sortActive is true, put inactive events at the bottom
+  if (filter.sortActive) {
+    aggregate.push({
+      $sort: {
+        isActive: -1,
+      },
+    });
+  }
 
   switch (filter.sortType) {
     case EVENT_SORT_TYPES.MOST_RECENTLY_CREATED:
