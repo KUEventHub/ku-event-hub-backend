@@ -100,7 +100,7 @@ export async function getEvents(filter: {
   // add joined users count
   aggregate.push({
     $addFields: {
-      joinedUsersCount: { $size: "$joinedUsers" },
+      participantsCount: { $size: "$participants" },
     },
   });
 
@@ -122,14 +122,14 @@ export async function getEvents(filter: {
     case EVENT_SORT_TYPES.MOST_PARTICIPANTS:
       aggregate.push({
         $sort: {
-          joinedUsersCount: -1,
+          participants: -1,
         },
       });
       break;
     case EVENT_SORT_TYPES.LEAST_PARTICIPANTS:
       aggregate.push({
         $sort: {
-          joinedUsersCount: 1,
+          participants: 1,
         },
       });
       break;
@@ -189,7 +189,7 @@ export async function updateEvent(
     description?: string;
     isActive?: boolean;
     qrCodeString?: string;
-    joinedUsers?: ObjectId[];
+    participants?: ObjectId[];
     eventTypes?: ObjectId[];
   }
 ) {
@@ -227,7 +227,7 @@ export async function findAndPopulateEvent(
   id: string,
   options: {
     createdBy?: boolean;
-    joinedUsers?: boolean;
+    participants?: boolean;
     eventTypes?: boolean;
   }
 ) {
@@ -240,9 +240,9 @@ export async function findAndPopulateEvent(
   if (options.createdBy) {
     await event.populate("createdBy");
   }
-  if (options.joinedUsers) {
+  if (options.participants) {
     await event.populate({
-      path: "joinedUsers",
+      path: "participants",
       populate: {
         path: "user",
       },

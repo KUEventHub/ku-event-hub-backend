@@ -227,9 +227,9 @@ router.post("/create", checkJwt, checkAdminRole, async (req, res) => {
         endTime: Date,
         location: string,
         totalSeats: number,
-        joinedUsersCount: number,
+        participantsCount: number,
         description: string,
-        joinedUsers: {
+        participants: {
           _id: string,
           name: string,
           profilePictureUrl: string,
@@ -243,11 +243,11 @@ router.get("/:id", async (req, res) => {
 
   try {
     const event = await findAndPopulateEvent(id, {
-      joinedUsers: true,
+      participants: true,
       eventTypes: true,
     });
 
-    const joinedUsers = toArray(event.joinedUsers);
+    const participants = toArray(event.participants);
 
     const eventJson = {
       name: event.name,
@@ -256,9 +256,9 @@ router.get("/:id", async (req, res) => {
       endTime: event.endTime,
       location: event.location,
       totalSeats: event.totalSeats,
-      joinedUsersCount: joinedUsers.length,
+      participantsCount: participants.length,
       description: event.description,
-      joinedUsers: joinedUsers.map((participation) => {
+      participants: participants.map((participation) => {
         return {
           _id: participation._id,
           name: participation.user.username,

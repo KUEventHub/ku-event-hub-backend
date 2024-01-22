@@ -67,7 +67,7 @@ const schema = new Schema({
     default: null,
     ref: TABLES.USER,
   },
-  joinedUsers: {
+  participants: {
     // users that joined this event
     // `Participation` ObjectId
     type: Array<mongoose.Types.ObjectId>,
