@@ -15,6 +15,7 @@ import "./schema/FriendRequest.ts";
 
 // init firebase
 import "./services/firebase.ts";
+import { checkActiveEvents } from "./services/events.ts";
 
 const app = express();
 const port = process.env.PORT;
@@ -33,3 +34,7 @@ app.use("/api/events", eventRouter);
 app.listen(port, () => {
   console.log(`[server]: Server is running at http://localhost:${port}`);
 });
+
+setInterval(async () => {
+  await checkActiveEvents();
+}, 1000 * 60 * 60);

@@ -133,8 +133,8 @@ export async function getEvents(filter: {
   // if sortActive is true, put inactive events at the bottom
   if (filter.sortActive) {
     sortJson.$sort = {
-      ...sortJson.$sort,
       isActive: -1,
+      ...sortJson.$sort,
     };
   }
 
@@ -254,4 +254,20 @@ export async function findAndPopulateEvent(
   }
 
   return event;
+}
+
+export async function checkActiveEvents() {
+  const now = new Date();
+
+  const events = await Event.find({
+    endTime: { $lt: now },
+    isActive: true,
+  });
+
+  for (const event of events) {
+    await event.updateOne({
+      isActive: false,
+      updatedAt: Date.now(),
+    });
+  }
 }
