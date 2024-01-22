@@ -256,6 +256,10 @@ export async function findAndPopulateEvent(
   return event;
 }
 
+/**
+ * checks if there are any events that are active
+ * but have already ended and updates them
+ */
 export async function checkActiveEvents() {
   const now = new Date();
 

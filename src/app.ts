@@ -35,6 +35,7 @@ app.listen(port, () => {
   console.log(`[server]: Server is running at http://localhost:${port}`);
 });
 
+// check active events every hour
 setInterval(async () => {
   await checkActiveEvents();
 }, 1000 * 60 * 60);
