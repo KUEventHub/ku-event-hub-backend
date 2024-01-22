@@ -224,6 +224,7 @@ router.post("/create", checkJwt, checkAdminRole, async (req, res) => {
         name: string,
         imageUrl: string,
         eventTypes: EventType[],
+        activityHours: number,
         startTime: Date,
         endTime: Date,
         location: string,
@@ -254,6 +255,7 @@ router.get("/:id", async (req, res) => {
       name: event.name,
       imageUrl: event.imageUrl,
       eventTypes: event.eventTypes,
+      activityHours: event.activityHours,
       startTime: event.startTime,
       endTime: event.endTime,
       location: event.location,
@@ -294,14 +296,15 @@ router.get("/:id", async (req, res) => {
  * {
       message: "Event found successfully",
       event: {
-        name: string,
-        eventTypes: EventType[],
-        startTime: Date,
-        endTime: Date,
-        location: string,
-        totalSeats: number,
-        participantsCount: number,
-        description: string,
+        name: event.name,
+        imageUrl: event.imageUrl,
+        eventTypes: eventTypes,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        location: event.location,
+        activityHours: event.activityHours,
+        totalSeats: event.totalSeats,
+        description: event.description,
       }
     }
  */
@@ -311,28 +314,23 @@ router.get("/:id/edit", async (req, res) => {
 
   try {
     const event = await findAndPopulateEvent(id, {
-      participants: true,
       eventTypes: true,
     });
 
-    const participants = toArray(event.participants);
+    const eventTypes = toArray(event.eventTypes).map(
+      (eventType) => eventType.name
+    );
 
     const eventJson = {
       name: event.name,
-      eventTypes: event.eventTypes,
+      imageUrl: event.imageUrl,
+      eventTypes: eventTypes,
       startTime: event.startTime,
       endTime: event.endTime,
       location: event.location,
+      activityHours: event.activityHours,
       totalSeats: event.totalSeats,
-      participantsCount: participants.length,
       description: event.description,
-      participants: participants.map((participation) => {
-        return {
-          _id: participation._id,
-          name: participation.user.username,
-          profilePictureUrl: participation.user.profilePictureUrl,
-        };
-      }),
     };
 
     res.status(200).send({
