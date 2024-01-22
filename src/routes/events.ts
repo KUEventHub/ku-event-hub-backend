@@ -223,7 +223,7 @@ router.post("/create", checkJwt, checkAdminRole, async (req, res) => {
       event: {
         name: string,
         imageUrl: string,
-        eventTypes: EventType[],
+        eventTypes: string[],
         activityHours: number,
         startTime: Date,
         endTime: Date,
@@ -250,11 +250,14 @@ router.get("/:id", async (req, res) => {
     });
 
     const participants = toArray(event.participants);
+    const eventTypes = toArray(event.eventTypes).map(
+      (eventType) => eventType.name
+    );
 
     const eventJson = {
       name: event.name,
       imageUrl: event.imageUrl,
-      eventTypes: event.eventTypes,
+      eventTypes: eventTypes,
       activityHours: event.activityHours,
       startTime: event.startTime,
       endTime: event.endTime,
@@ -296,15 +299,15 @@ router.get("/:id", async (req, res) => {
  * {
       message: "Event found successfully",
       event: {
-        name: event.name,
-        imageUrl: event.imageUrl,
-        eventTypes: eventTypes,
-        startTime: event.startTime,
-        endTime: event.endTime,
-        location: event.location,
-        activityHours: event.activityHours,
-        totalSeats: event.totalSeats,
-        description: event.description,
+        name: string,
+        imageUrl: string,
+        eventTypes: string[],
+        startTime: Date,
+        endTime: Date,
+        location: string,
+        activityHours: number,
+        totalSeats: number,
+        description: string,
       }
     }
  */
