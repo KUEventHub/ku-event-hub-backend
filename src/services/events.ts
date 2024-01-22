@@ -131,7 +131,14 @@ export async function getEvents(filter: {
     case EVENT_SORT_TYPES.MOST_PARTICIPANTS:
       aggregate.push({
         $sort: {
-          joinedUsers: -1,
+          joinedUsersCount: -1,
+        },
+      });
+      break;
+    case EVENT_SORT_TYPES.LEAST_PARTICIPANTS:
+      aggregate.push({
+        $sort: {
+          joinedUsersCount: 1,
         },
       });
       break;
