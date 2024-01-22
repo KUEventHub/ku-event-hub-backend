@@ -4,8 +4,14 @@ import { getEventTypesFromStrings } from "../services/eventtypes.ts";
 import { findUserWithAuth0Id, getAuth0Id } from "../services/users.ts";
 import { encryptPassword } from "../services/bcrypt.ts";
 import { signIn, signOut, uploadEventPicture } from "../services/firebase.ts";
-import { createEvent, getEvents, updateEvent } from "../services/events.ts";
+import {
+  createEvent,
+  findAndPopulateEvent,
+  getEvents,
+  updateEvent,
+} from "../services/events.ts";
 import { EVENT_SORT_TYPES } from "../helper/constants.ts";
+import { toArray } from "../services/mongoose.ts";
 
 const router = Router();
 
@@ -196,6 +202,77 @@ router.post("/create", checkJwt, checkAdminRole, async (req, res) => {
     });
   } catch (e: any) {
     // handle error
+    console.error(e);
+    res.status(400).send(e);
+  }
+});
+
+/**
+ * @route get /api/events/:id
+ * :id = event's _id
+ * finds an event in the database and returns information
+ * 
+ * requirements:
+ * - params: {
+      id: string;
+    }
+ * 
+ * results:
+ * {
+      message: "Event found successfully",
+      event: {
+        name: string,
+        eventTypes: EventType[],
+        startTime: Date,
+        endTime: Date,
+        location: string,
+        totalSeats: number,
+        joinedUsersCount: number,
+        description: string,
+        joinedUsers: {
+          _id: string,
+          name: string,
+          profilePictureUrl: string,
+        }[]
+      }
+    }
+ */
+router.get("/:id", async (req, res) => {
+  // get id from url params
+  const id = req.params.id;
+
+  try {
+    const event = await findAndPopulateEvent(id, {
+      joinedUsers: true,
+      eventTypes: true,
+    });
+
+    const joinedUsers = toArray(event.joinedUsers);
+
+    const eventJson = {
+      name: event.name,
+      eventTypes: event.eventTypes,
+      startTime: event.startTime,
+      endTime: event.endTime,
+      location: event.location,
+      totalSeats: event.totalSeats,
+      joinedUsersCount: joinedUsers.length,
+      description: event.description,
+      joinedUsers: joinedUsers.map((participation) => {
+        return {
+          _id: participation._id,
+          name: participation.user.username,
+          profilePictureUrl: participation.user.profilePictureUrl,
+        };
+      }),
+    };
+
+    res.status(200).send({
+      message: "Event found successfully",
+      event: eventJson,
+    });
+  } catch (e: any) {
+    // handle errors
     console.error(e);
     res.status(400).send(e);
   }

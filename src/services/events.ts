@@ -241,7 +241,12 @@ export async function findAndPopulateEvent(
     await event.populate("createdBy");
   }
   if (options.joinedUsers) {
-    await event.populate("joinedUsers");
+    await event.populate({
+      path: "joinedUsers",
+      populate: {
+        path: "user",
+      },
+    });
   }
   if (options.eventTypes) {
     await event.populate("eventTypes");

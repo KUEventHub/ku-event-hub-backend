@@ -9,6 +9,8 @@ export async function getEventTypesFromStrings(eventTypes: string[]) {
       return foundEventType;
     })
   );
-  
+
   return eventTypesObjects;
 }
+
+
