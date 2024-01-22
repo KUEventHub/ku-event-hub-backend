@@ -104,15 +104,6 @@ export async function getEvents(filter: {
     },
   });
 
-  // if sortActive is true, put inactive events at the bottom
-  if (filter.sortActive) {
-    aggregate.push({
-      $sort: {
-        isActive: -1,
-      },
-    });
-  }
-
   switch (filter.sortType) {
     case EVENT_SORT_TYPES.MOST_RECENTLY_CREATED:
       aggregate.push({
@@ -144,6 +135,15 @@ export async function getEvents(filter: {
       break;
     default:
       throw new Error("Invalid sort type");
+  }
+
+  // if sortActive is true, put inactive events at the bottom
+  if (filter.sortActive) {
+    aggregate.push({
+      $sort: {
+        isActive: -1,
+      },
+    });
   }
 
   // add pagination
