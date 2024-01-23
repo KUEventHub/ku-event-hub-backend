@@ -345,19 +345,34 @@ router.get("/:id/edit", checkAccessToken, checkAdminRole, async (req, res) => {
  * edits an event in the database
  * 
  * requirements:
+ * - authorization: Bearer <access_token>
+ * - auth0 role: Admin
  * - params: {
       id: string;
     }
- * don't use still doing :)
+ * - body: {
+      event: {
+        name?: string;
+        image?: {
+          url?: string;
+          base64Image?: string;
+        };
+        eventTypes?: string[];
+        startTime?: number;
+        endTime?: number;
+        location?: string;
+        activityHours?: number;
+        totalSeats?: number;
+        description?: string;
+      };
+    } 
  * 
+ * results:
+ * {
+      message: "Event updated successfully",
+    }
  * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
+
  */
 router.post("/:id/edit", checkAccessToken, checkAdminRole, async (req, res) => {
   // get id from url params
@@ -367,7 +382,7 @@ router.post("/:id/edit", checkAccessToken, checkAdminRole, async (req, res) => {
   const body: {
     event: {
       name?: string;
-      image: {
+      image?: {
         url?: string;
         base64Image?: string;
       };
@@ -411,15 +426,8 @@ router.post("/:id/edit", checkAccessToken, checkAdminRole, async (req, res) => {
         ? eventTypes.map((eventType) => eventType!._id)
         : [];
 
-    let imageUrl = await getImageUrl(
-      body.event.image,
-      user._id.toString(),
-      event._id.toString()
-    );
-
     const eventJson: any = {
       name: body.event.name,
-      imageUrl: imageUrl,
       eventTypes: eventTypeIds,
       location: body.event.location,
       activityHours: body.event.activityHours,
@@ -432,6 +440,15 @@ router.post("/:id/edit", checkAccessToken, checkAdminRole, async (req, res) => {
     }
     if (body.event.endTime) {
       eventJson.endTime = new Date(body.event.endTime);
+    }
+
+    if (body.event.image) {
+      let imageUrl = await getImageUrl(
+        body.event.image,
+        user._id.toString(),
+        event._id.toString()
+      );
+      eventJson.imageUrl = imageUrl;
     }
 
     await updateEvent(event._id.toString(), eventJson);

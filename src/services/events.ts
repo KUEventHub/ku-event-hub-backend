@@ -3,7 +3,7 @@ import Event from "../schema/Event.ts";
 import { getEventTypesFromStrings } from "./eventtypes.ts";
 import { EVENT_SORT_TYPES, TABLES } from "../helper/constants.ts";
 import { encryptPassword } from "./bcrypt.ts";
-import { findUserWithAuth0Id } from "./users.ts";
+import { findUserWithAuth0Id, findUserWithId } from "./users.ts";
 import { signIn, signOut, uploadEventPicture } from "./firebase.ts";
 
 /**
@@ -281,7 +281,7 @@ export async function checkActiveEvents() {
 
 /**
  * Updates an event's image and returns the url.
- * 
+ *
  * @param image the image, either url or base64 encoded image
  * @param userId event id
  * @param eventId event id
@@ -293,7 +293,7 @@ export async function getImageUrl(
   eventId: string
 ) {
   // get user and event
-  const user = await findUserWithAuth0Id(userId);
+  const user = await findUserWithId(userId);
   const event = await findEventWithId(eventId);
 
   if (!user) {
@@ -316,10 +316,7 @@ export async function getImageUrl(
       user.firebaseSalt
     );
     await signIn(user.email, passwordObj.password);
-    imageUrl = await uploadEventPicture(
-      user.auth0UserId,
-      image.base64Image
-    );
+    imageUrl = await uploadEventPicture(user.auth0UserId, image.base64Image);
     await signOut();
   }
 
