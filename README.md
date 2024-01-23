@@ -20,3 +20,6 @@
 
 - `get` `/api/events/` fetch events
 - `post` `/api/events/create` create event
+- `get` `/api/events/:id` fetch event information
+- `get` `/api/events/:id/edit` fetch event information for editing
+- `post` `/api/events/:id/edit` edit event information
