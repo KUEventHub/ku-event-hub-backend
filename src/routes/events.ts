@@ -2,8 +2,6 @@ import { Router } from "express";
 import { checkAdminRole, checkAccessToken } from "../middleware/auth.ts";
 import { getEventTypesFromStrings } from "../services/eventtypes.ts";
 import { findUserWithAuth0Id, getAuth0Id } from "../services/users.ts";
-import { encryptPassword } from "../services/bcrypt.ts";
-import { signIn, signOut, uploadEventPicture } from "../services/firebase.ts";
 import {
   createEvent,
   findAndPopulateEvent,
@@ -223,6 +221,7 @@ router.post("/create", checkAccessToken, checkAdminRole, async (req, res) => {
         totalSeats: number,
         participantsCount: number,
         description: string,
+        isActive: boolean,
         participants: {
           _id: string,
           name: string,
@@ -257,6 +256,7 @@ router.get("/:id", async (req, res) => {
       totalSeats: event.totalSeats,
       participantsCount: participants.length,
       description: event.description,
+      isActive: event.isActive,
       participants: participants.map((participation) => {
         return {
           _id: participation.user._id,
