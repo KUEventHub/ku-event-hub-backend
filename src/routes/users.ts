@@ -18,6 +18,7 @@ import {
 } from "../services/firebase.ts";
 import { encryptPassword } from "../services/bcrypt.ts";
 import { ROLES } from "../helper/constants.ts";
+import { toArray } from "../services/mongoose.ts";
 
 const router = Router();
 
@@ -342,9 +343,11 @@ router.get("/:id", async (req, res) => {
 /**
  * @route get /api/users/:id/edit
  * :id = user's _id
- * finds a user in the database and fetches information
+ * finds a user in the database and sends information
  * to be edited
  * 
+ * base64img has a size limit of ~5mb
+ *
  * requirements:
  * - authorization: Bearer <access_token>
  * - user has to be the same as the user in the url
@@ -353,18 +356,18 @@ router.get("/:id", async (req, res) => {
  * {
       message: "User found successfully",
       user: {
-        profilePictureUrl: string,
-        username: string,
-        firstName: string,
-        lastName: string,
-        email: string,
-        idCode: string,
-        faculty: string,
-        phoneNumber: string,
-        gender: string,
-        interestedEventTypes: EventType[],
-        description: string,
-      },
+        profilePictureUrl: string;
+        username: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+        idCode: string;
+        faculty: string;
+        phoneNumber: string;
+        gender: string;
+        description: string;
+        interestedEventTypes: any[];
+      }
     }
  */
 router.get("/:id/edit", checkAccessToken, checkSameUser, async (req, res) => {
@@ -373,7 +376,11 @@ router.get("/:id/edit", checkAccessToken, checkSameUser, async (req, res) => {
 
   try {
     // find a user with id
-    const user = await findUserWithId(id);
+    const user = await findAndPopulateUser(id, {
+      interestedEventTypes: true,
+    });
+
+    const interestedEventTypes = toArray(user.interestedEventTypes);
 
     if (!user) {
       res.status(404).send({
@@ -382,9 +389,7 @@ router.get("/:id/edit", checkAccessToken, checkSameUser, async (req, res) => {
       return;
     }
 
-    await user.populate("interestedEventTypes");
-
-    const userObj = {
+    const userJson = {
       profilePictureUrl: user.profilePictureUrl,
       username: user.username,
       firstName: user.firstName,
@@ -394,13 +399,15 @@ router.get("/:id/edit", checkAccessToken, checkSameUser, async (req, res) => {
       faculty: user.faculty,
       phoneNumber: user.phoneNumber,
       gender: user.gender,
-      interestedEventTypes: user.interestedEventTypes,
       description: user.description,
+      interestedEventTypes: interestedEventTypes.map(
+        (eventType) => eventType.name
+      ),
     };
 
     res.status(200).send({
       message: "User found successfully",
-      user: userObj,
+      user: userJson,
     });
   } catch (e: any) {
     // handle errors
