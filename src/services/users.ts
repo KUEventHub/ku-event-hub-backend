@@ -154,6 +154,13 @@ export async function findAndPopulateUser(
   return user;
 }
 
+/**
+ * Updates a user's profile picture and returns the url.
+ * 
+ * @param profilePicture the profile picture, either url or base64 encoded image
+ * @param userId user id
+ * @returns profile picture url
+ */
 export async function getProfilePictureUrl(
   profilePicture: { url?: string; base64Image?: string },
   userId: string

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { checkAdminRole, checkJwt } from "../middleware/auth.ts";
+import { checkAdminRole, checkAccessToken } from "../middleware/auth.ts";
 import { getEventTypesFromStrings } from "../services/eventtypes.ts";
 import { findUserWithAuth0Id, getAuth0Id } from "../services/users.ts";
 import { encryptPassword } from "../services/bcrypt.ts";
@@ -7,7 +7,9 @@ import { signIn, signOut, uploadEventPicture } from "../services/firebase.ts";
 import {
   createEvent,
   findAndPopulateEvent,
+  findEventWithId,
   getEvents,
+  getImageUrl,
   updateEvent,
 } from "../services/events.ts";
 import { EVENT_SORT_TYPES } from "../helper/constants.ts";
@@ -111,7 +113,7 @@ router.get("/", async (req, res) => {
       id: string,
     }   
  */
-router.post("/create", checkJwt, checkAdminRole, async (req, res) => {
+router.post("/create", checkAccessToken, checkAdminRole, async (req, res) => {
   const body: {
     event: {
       name: string;
@@ -173,21 +175,11 @@ router.post("/create", checkJwt, checkAdminRole, async (req, res) => {
 
     const event = await createEvent(eventJson);
 
-    let imageUrl: string | undefined = undefined;
-    // if profile picture is sent as url, use that
-    if (body.event.image.url) {
-      imageUrl = body.event.image.url;
-    } else if (body.event.image.base64Image) {
-      // if profile picture is sent as base64 encoded image
-      // upload it to firebase and use that
-      const passwordObj = await encryptPassword(auth0id, user.firebaseSalt);
-      await signIn(user.email, passwordObj.password);
-      imageUrl = await uploadEventPicture(
-        event._id.toString(),
-        body.event.image.base64Image
-      );
-      await signOut();
-    }
+    let imageUrl = await getImageUrl(
+      body.event.image,
+      user._id.toString(),
+      event._id.toString()
+    );
 
     // if there is an image url, add it to the event
     if (imageUrl) {
@@ -267,7 +259,7 @@ router.get("/:id", async (req, res) => {
       description: event.description,
       participants: participants.map((participation) => {
         return {
-          _id: participation._id,
+          _id: participation.user._id,
           name: participation.user.username,
           profilePictureUrl: participation.user.profilePictureUrl,
         };
@@ -311,7 +303,7 @@ router.get("/:id", async (req, res) => {
       }
     }
  */
-router.get("/:id/edit", async (req, res) => {
+router.get("/:id/edit", checkAccessToken, checkAdminRole, async (req, res) => {
   // get id from url params
   const id = req.params.id;
 
@@ -339,6 +331,113 @@ router.get("/:id/edit", async (req, res) => {
     res.status(200).send({
       message: "Event found successfully",
       event: eventJson,
+    });
+  } catch (e: any) {
+    // handle errors
+    console.error(e);
+    res.status(400).send(e);
+  }
+});
+
+/**
+ * @route post /api/events/:id/edit
+ * :id = event's _id
+ * edits an event in the database
+ * 
+ * requirements:
+ * - params: {
+      id: string;
+    }
+ * don't use still doing :)
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ */
+router.post("/:id/edit", checkAccessToken, checkAdminRole, async (req, res) => {
+  // get id from url params
+  const id = req.params.id;
+
+  // body
+  const body: {
+    event: {
+      name?: string;
+      image: {
+        url?: string;
+        base64Image?: string;
+      };
+      eventTypes?: string[];
+      startTime?: number;
+      endTime?: number;
+      location?: string;
+      activityHours?: number;
+      totalSeats?: number;
+      description?: string;
+    };
+  } = req.body;
+
+  try {
+    // get user id from token
+    const token = req.get("Authorization");
+    const auth0id = getAuth0Id(token!);
+    const user = await findUserWithAuth0Id(auth0id);
+    if (!user) {
+      res.status(404).send({
+        error: "User not found",
+      });
+      return;
+    }
+
+    // find event with this id
+    const event = await findEventWithId(id);
+    if (!event) {
+      res.status(404).send({
+        error: "Event not found",
+      });
+      return;
+    }
+
+    // get event types ids
+    const eventTypes = body.event.eventTypes
+      ? await getEventTypesFromStrings(body.event.eventTypes)
+      : [];
+    const eventTypeIds =
+      eventTypes.length > 0
+        ? eventTypes.map((eventType) => eventType!._id)
+        : [];
+
+    let imageUrl = await getImageUrl(
+      body.event.image,
+      user._id.toString(),
+      event._id.toString()
+    );
+
+    const eventJson: any = {
+      name: body.event.name,
+      imageUrl: imageUrl,
+      eventTypes: eventTypeIds,
+      location: body.event.location,
+      activityHours: body.event.activityHours,
+      totalSeats: body.event.totalSeats,
+      description: body.event.description,
+    };
+
+    if (body.event.startTime) {
+      eventJson.startTime = new Date(body.event.startTime);
+    }
+    if (body.event.endTime) {
+      eventJson.endTime = new Date(body.event.endTime);
+    }
+
+    await updateEvent(event._id.toString(), eventJson);
+
+    res.status(200).send({
+      message: "Event updated successfully",
     });
   } catch (e: any) {
     // handle errors

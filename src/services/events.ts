@@ -2,6 +2,9 @@ import { ObjectId } from "mongodb";
 import Event from "../schema/Event.ts";
 import { getEventTypesFromStrings } from "./eventtypes.ts";
 import { EVENT_SORT_TYPES, TABLES } from "../helper/constants.ts";
+import { encryptPassword } from "./bcrypt.ts";
+import { findUserWithAuth0Id } from "./users.ts";
+import { signIn, signOut, uploadEventPicture } from "./firebase.ts";
 
 /**
  * Creates a new event, saves it to the database
@@ -274,4 +277,51 @@ export async function checkActiveEvents() {
       updatedAt: Date.now(),
     });
   }
+}
+
+/**
+ * Updates an event's image and returns the url.
+ * 
+ * @param image the image, either url or base64 encoded image
+ * @param userId event id
+ * @param eventId event id
+ * @returns image url
+ */
+export async function getImageUrl(
+  image: { url?: string; base64Image?: string },
+  userId: string,
+  eventId: string
+) {
+  // get user and event
+  const user = await findUserWithAuth0Id(userId);
+  const event = await findEventWithId(eventId);
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+  if (!event) {
+    throw new Error("Event not found");
+  }
+
+  let imageUrl: string | undefined = undefined;
+
+  // if image is sent as url, use that
+  if (image.url) {
+    imageUrl = image.url;
+  } else if (image.base64Image) {
+    // if image is sent as base64 encoded image
+    // upload it to firebase and use that
+    const passwordObj = await encryptPassword(
+      user.auth0UserId,
+      user.firebaseSalt
+    );
+    await signIn(user.email, passwordObj.password);
+    imageUrl = await uploadEventPicture(
+      user.auth0UserId,
+      image.base64Image
+    );
+    await signOut();
+  }
+
+  return imageUrl;
 }

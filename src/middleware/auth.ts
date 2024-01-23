@@ -16,7 +16,7 @@ declare module "jwt-decode" {
  * Authorization middleware. When used, the Access Token must
  * exist and be verified against the Auth0 JSON Web Key Set.
  */
-export const checkJwt = auth({
+export const checkAccessToken = auth({
   audience: process.env.AUTH0_IDENTIFIER,
   issuerBaseURL: process.env.AUTH0_DOMAIN,
   tokenSigningAlg: "RS256",

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { checkJwt, checkSameUser } from "../middleware/auth.ts";
+import { checkAccessToken, checkSameUser } from "../middleware/auth.ts";
 import {
   createUser,
   findUserWithId,
@@ -54,7 +54,7 @@ const router = Router();
       id: string,
     }
  */
-router.post("/create", checkJwt, async (req, res) => {
+router.post("/create", checkAccessToken, async (req, res) => {
   // user information is sent in the body as json
   const body: {
     user: {
@@ -172,7 +172,7 @@ router.post("/create", checkJwt, async (req, res) => {
       },
     }
  */
-router.get("/me", checkJwt, async (req, res) => {
+router.get("/me", checkAccessToken, async (req, res) => {
   try {
     const token = req.get("Authorization");
     const auth0id = getAuth0Id(token!);
@@ -222,6 +222,7 @@ router.get("/me", checkJwt, async (req, res) => {
         username: string;
         profilePictureUrl: string;
         role: string;
+        description: string;
         information: {
           show: boolean;
           // if show is true, these fields are visible
@@ -283,7 +284,7 @@ router.get("/:id", async (req, res) => {
       username: user.username,
       profilePictureUrl: user.profilePictureUrl,
       role: user.role,
-
+      description: user.description,
       // fields that are visible depending on privacy settings
       // user information
       information: showUserInformation
@@ -366,7 +367,7 @@ router.get("/:id", async (req, res) => {
       },
     }
  */
-router.get("/:id/edit", checkJwt, checkSameUser, async (req, res) => {
+router.get("/:id/edit", checkAccessToken, checkSameUser, async (req, res) => {
   // get id from url params
   const id = req.params.id;
 
@@ -440,7 +441,7 @@ router.get("/:id/edit", checkJwt, checkSameUser, async (req, res) => {
       message: "User updated successfully",
     }
  */
-router.post("/:id/edit", checkJwt, checkSameUser, async (req, res) => {
+router.post("/:id/edit", checkAccessToken, checkSameUser, async (req, res) => {
   // get id from url params
   const id = req.params.id;
 
