@@ -316,7 +316,10 @@ export async function getImageUrl(
       user.firebaseSalt
     );
     await signIn(user.email, passwordObj.password);
-    imageUrl = await uploadEventPicture(user.auth0UserId, image.base64Image);
+    imageUrl = await uploadEventPicture(
+      event._id.toString(),
+      image.base64Image
+    );
     await signOut();
   }
 

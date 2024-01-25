@@ -259,8 +259,13 @@ router.get("/:id", async (req, res) => {
   const id = req.params.id;
 
   try {
+    // token
+    const token = req.get("Authorization");
+    const auth0id = getAuth0Id(token!);
+
     // find a user with id
     const user = await findUserWithId(id);
+    const auth0User = await findUserWithAuth0Id(auth0id);
 
     if (!user) {
       res.status(404).send({
@@ -268,11 +273,19 @@ router.get("/:id", async (req, res) => {
       });
       return;
     }
+    if (!auth0User) {
+      res.status(404).send({
+        error: "User not found",
+      });
+      return;
+    }
+
+    const isSameUser = user._id.toString() === auth0User._id.toString();
 
     // get privacy settings from user
-    const showUserInformation = user.showUserInformation;
-    const showEvents = user.showEvents;
-    const showFriends = user.showFriends;
+    const showUserInformation = isSameUser || user.showUserInformation;
+    const showEvents = isSameUser || user.showEvents;
+    const showFriends = isSameUser || user.showFriends;
 
     const populatedUser = await findAndPopulateUser(id, {
       joinedEvents: showEvents,
