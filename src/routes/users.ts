@@ -12,7 +12,6 @@ import {
 import { getEventTypesFromStrings } from "../services/eventtypes.ts";
 import {
   registerUser,
-  signIn,
   signOut,
   uploadProfilePicture,
 } from "../services/firebase.ts";
@@ -261,6 +260,13 @@ router.get("/:id", async (req, res) => {
   try {
     // token
     const token = req.get("Authorization");
+    console.log(token);
+    if (!token) {
+      res.status(401).send({
+        error: "Access token not found",
+      });
+      return;
+    }
     const auth0id = getAuth0Id(token!);
 
     // find a user with id
