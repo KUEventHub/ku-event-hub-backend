@@ -260,18 +260,11 @@ router.get("/:id", async (req, res) => {
   try {
     // token
     const token = req.get("Authorization");
-    console.log(token);
-    if (!token) {
-      res.status(401).send({
-        error: "Access token not found",
-      });
-      return;
-    }
-    const auth0id = getAuth0Id(token!);
+    let isSameUser: boolean;
+    let auth0User;
 
     // find a user with id
     const user = await findUserWithId(id);
-    const auth0User = await findUserWithAuth0Id(auth0id);
 
     if (!user) {
       res.status(404).send({
@@ -279,14 +272,23 @@ router.get("/:id", async (req, res) => {
       });
       return;
     }
-    if (!auth0User) {
-      res.status(404).send({
-        error: "User not found",
-      });
-      return;
-    }
 
-    const isSameUser = user._id.toString() === auth0User._id.toString();
+    if (!token) {
+      isSameUser = false;
+    } else {
+      const auth0id = getAuth0Id(token!);
+
+      auth0User = await findUserWithAuth0Id(auth0id);
+
+      if (!auth0User) {
+        res.status(404).send({
+          error: "User not found",
+        });
+        return;
+      }
+
+      isSameUser = user._id.toString() === auth0User._id.toString();
+    }
 
     // get privacy settings from user
     const showUserInformation = isSameUser || user.showUserInformation;
