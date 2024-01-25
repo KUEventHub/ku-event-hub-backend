@@ -291,9 +291,9 @@ router.get("/:id", async (req, res) => {
     }
 
     // get privacy settings from user
-    const showUserInformation = isSameUser && user.showUserInformation;
-    const showEvents = isSameUser && user.showEvents;
-    const showFriends = isSameUser && user.showFriends;
+    const showUserInformation = isSameUser || user.showUserInformation;
+    const showEvents = isSameUser || user.showEvents;
+    const showFriends = isSameUser || user.showFriends;
 
     const populatedUser = await findAndPopulateUser(id, {
       joinedEvents: showEvents,
