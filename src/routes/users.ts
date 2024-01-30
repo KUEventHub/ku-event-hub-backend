@@ -523,7 +523,7 @@ router.post("/:id/edit", checkAccessToken, checkSameUser, async (req, res) => {
       description: body.user.description,
     };
 
-    if (eventTypeIds.length > 0) {
+    if (body.user.interestedEventTypes) {
       userJson.interestedEventTypes = eventTypeIds;
     }
 
