@@ -11,6 +11,12 @@ const schema = new Schema({
     type: Date,
     default: Date.now,
   },
+  isActive: {
+    // whether the participation is still active
+    // (user hasn't left the event yet)
+    type: Boolean,
+    default: false,
+  },
   isConfirmed: {
     // whether the participation is confirmed or not
     type: Boolean,
