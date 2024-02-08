@@ -12,6 +12,7 @@
 
 - `post` `/api/users/create` create user
 - `get` `/api/users/me` get user for user menu
+- `post` `/api/users/login` log user's login
 - `get` `/api/users/:id` get user information
 - `get` `/api/users/:id/edit` get user information for editing
 - `post` `/api/users/:id/edit` edit user information

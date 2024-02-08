@@ -19,6 +19,7 @@ import { encryptPassword } from "../services/bcrypt.ts";
 import { ROLES } from "../helper/constants.ts";
 import { toArray } from "../services/mongoose.ts";
 import { findEventWithId } from "../services/events.ts";
+import LoginLog from "../schema/LoginLog.ts";
 
 const router = Router();
 
@@ -196,6 +197,47 @@ router.get("/me", checkAccessToken, async (req, res) => {
     res.status(200).send({
       message: "User found successfully",
       user: userObj,
+    });
+  } catch (e: any) {
+    // handle errors
+    console.error(e);
+    res.status(400).send(e);
+  }
+});
+
+/**
+ * @route post /api/users/login
+ * send a login log to the database
+ *
+ * requirements:
+ * - authorization: Bearer <access_token>
+ *
+ * results:
+ * {
+      message: "User login logged successfully",
+    }
+ */
+router.post("/login", checkAccessToken, async (req, res) => {
+  try {
+    const token = req.get("Authorization");
+    const auth0id = getAuth0Id(token!);
+    const user = await findUserWithAuth0Id(auth0id);
+
+    if (!user) {
+      res.status(404).send({
+        error: "User not found",
+      });
+      return;
+    }
+
+    const loginLog = new LoginLog({
+      user: user._id,
+    });
+
+    await loginLog.save();
+
+    res.status(200).send({
+      message: "User login logged successfully",
     });
   } catch (e: any) {
     // handle errors

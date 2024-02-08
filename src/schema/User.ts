@@ -1,5 +1,10 @@
 import mongoose, { Schema, model } from "mongoose";
-import { EMAIL_REGEX, FACULTY_LIST, ROLES, TABLES } from "../helper/constants.ts";
+import {
+  EMAIL_REGEX,
+  FACULTY_LIST,
+  ROLES,
+  TABLES,
+} from "../helper/constants.ts";
 import {
   getInvalidValueString,
   getMaximumLengthString,
