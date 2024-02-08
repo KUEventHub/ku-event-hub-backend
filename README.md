@@ -11,15 +11,16 @@
 #### users `/api/users`
 
 - `post` `/api/users/create` create user
-- `get` `/api/users/me` fetch user for user menu
-- `get` `/api/users/:id` fetch user information
+- `get` `/api/users/me` get user for user menu
+- `get` `/api/users/:id` get user information
 - `get` `/api/users/:id/edit` get user information for editing
 - `post` `/api/users/:id/edit` edit user information
+- `post` `/api/users/:id/edit-privacy` edit user privacy
 
 #### events `/api/events`
 
-- `get` `/api/events/` fetch events
+- `get` `/api/events/` get events
 - `post` `/api/events/create` create event
-- `get` `/api/events/:id` fetch event information
-- `get` `/api/events/:id/edit` fetch event information for editing
+- `get` `/api/events/:id` get event information
+- `get` `/api/events/:id/edit` get event information for editing
 - `post` `/api/events/:id/edit` edit event information

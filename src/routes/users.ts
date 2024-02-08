@@ -438,6 +438,83 @@ router.get("/:id/edit", checkAccessToken, checkSameUser, async (req, res) => {
 });
 
 /**
+ * @route post /api/users/:id/edit-privacy
+ * :id = user's _id
+ * finds a user in the database and edits its privacy settings
+ *
+ * requirements:
+ * - authorization: Bearer <access_token>
+ * - body: {
+      user: {
+        showUserInformation?: boolean;
+        showEvents?: boolean;
+        showFriends?: boolean;
+      };
+    }
+ * - user has to be the same as the user in the url
+ *
+ * results:
+ * {
+      message: "User privacy settings updated successfully",
+    }
+ */
+router.post(
+  "/:id/edit-privacy",
+  checkAccessToken,
+  checkSameUser,
+  async (req, res) => {
+    // get id from url params
+    const id = req.params.id;
+
+    const body: {
+      user: {
+        showUserInformation?: boolean;
+        showEvents?: boolean;
+        showFriends?: boolean;
+      };
+    } = req.body;
+
+    try {
+      // find a user with id
+      const user = await findUserWithId(id);
+
+      if (!user) {
+        res.status(404).send({
+          error: "User not found",
+        });
+        return;
+      }
+
+      const userJson: any = {
+        updatedAt: Date.now(),
+      };
+
+      if (body.user.showUserInformation !== undefined) {
+        userJson.showUserInformation = body.user.showUserInformation;
+      }
+
+      if (body.user.showEvents !== undefined) {
+        userJson.showEvents = body.user.showEvents;
+      }
+
+      if (body.user.showFriends !== undefined) {
+        userJson.showFriends = body.user.showFriends;
+      }
+
+      await user.updateOne(userJson);
+
+      res.status(200).send({
+        message: "User privacy settings updated successfully",
+      });
+    } catch (e: any) {
+      // handle errors
+      console.error(e);
+      res.status(400).send(e);
+    }
+  }
+);
+
+/**
  * @route post /api/users/:id/edit
  * :id = user's _id
  * finds a user in the database and edits it
@@ -521,6 +598,7 @@ router.post("/:id/edit", checkAccessToken, checkSameUser, async (req, res) => {
       phoneNumber: body.user.phoneNumber,
       gender: body.user.gender,
       description: body.user.description,
+      updatedAt: Date.now(),
     };
 
     if (body.user.interestedEventTypes) {
