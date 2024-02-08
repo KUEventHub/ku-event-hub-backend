@@ -5,6 +5,7 @@ import { EVENT_SORT_TYPES, TABLES } from "../helper/constants.ts";
 import { encryptPassword } from "./bcrypt.ts";
 import { findUserWithAuth0Id, findUserWithId } from "./users.ts";
 import { signIn, signOut, uploadEventPicture } from "./firebase.ts";
+import { toArray } from "./mongoose.ts";
 
 /**
  * Creates a new event, saves it to the database
@@ -97,13 +98,6 @@ export async function getEvents(filter: {
 
   let aggregate = [];
 
-  // add joined users count
-  aggregate.push({
-    $addFields: {
-      participantsCount: { $size: "$participants" },
-    },
-  });
-
   switch (filter.sortType) {
     case EVENT_SORT_TYPES.MOST_RECENTLY_CREATED:
       sortJson.$sort = {
@@ -114,7 +108,7 @@ export async function getEvents(filter: {
     case EVENT_SORT_TYPES.MOST_RECENT_START_DATE:
       sortJson.$sort = {
         ...sortJson.$sort,
-        startTime: 1,
+        startTime: -1,
       };
       break;
     case EVENT_SORT_TYPES.MOST_PARTICIPANTS:
@@ -158,19 +152,57 @@ export async function getEvents(filter: {
     $limit: filter.pageSize,
   });
 
-  // populate event types
-  aggregate.push({
-    $lookup: {
-      from: TABLES.EVENT_TYPE,
-      localField: "eventTypes",
-      foreignField: "_id",
-      as: "eventTypes",
-    },
-  });
-
   const events = await Event.aggregate(aggregate);
 
-  return events;
+  // console.log(events);
+
+  const modifiedEvents = events.map(async (event) => {
+    const eventObj = await findEventWithId(event._id);
+
+    if (!eventObj) {
+      throw new Error("Event not found");
+    }
+
+    await eventObj.populate("participants");
+    await eventObj.populate("eventTypes");
+    const eventTypes = toArray(eventObj.eventTypes);
+
+    const participants = toArray(eventObj.participants);
+    const activeParticipants = participants.filter(
+      (participant) => participant.isActive
+    );
+
+    const returnObj = {
+      ...eventObj,
+      eventTypes: eventTypes,
+      participantsCount: activeParticipants.length,
+    };
+
+    return returnObj;
+  });
+
+  const promisedEvents = await Promise.all(modifiedEvents);
+
+  const formattedPromisedEvents = promisedEvents.map((event: any) => {
+    const doc = event._doc;
+
+    return {
+      _id: doc._id,
+      name: doc.name,
+      imageUrl: doc.imageUrl,
+      activityHours: doc.activityHours,
+      totalSeats: doc.totalSeats,
+      startTime: doc.startTime,
+      endTime: doc.endTime,
+      location: doc.location,
+      description: doc.description,
+      isActive: doc.isActive,
+      participantsCount: event.participantsCount,
+      eventTypes: event.eventTypes,
+    };
+  });
+
+  return formattedPromisedEvents;
 }
 
 /**

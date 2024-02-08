@@ -18,6 +18,7 @@ import {
 import { encryptPassword } from "../services/bcrypt.ts";
 import { ROLES } from "../helper/constants.ts";
 import { toArray } from "../services/mongoose.ts";
+import { findEventWithId } from "../services/events.ts";
 
 const router = Router();
 
@@ -300,9 +301,45 @@ router.get("/:id", async (req, res) => {
       friends: showFriends,
     });
 
+    const joinedEvents = showEvents ? toArray(populatedUser.joinedEvents) : [];
+    const activeJoinedEvents = joinedEvents.filter((event) => event.isActive);
+    const events = await Promise.all(
+      activeJoinedEvents.map(async (participations) => {
+        // find event
+        const event = await findEventWithId(participations.event);
+
+        if (!event) {
+          return null;
+        }
+
+        // find active participations
+        await event.populate("participants");
+        const activeParticipants = toArray(event.participants).filter(
+          (participation) => participation.isActive
+        );
+
+        return {
+          _id: event._id,
+          name: event.name,
+          imageUrl: event.imageUrl,
+          activityHours: event.activityHours,
+          totalSeats: event.totalSeats,
+          startTime: event.startTime,
+          endTime: event.endTime,
+          location: event.location,
+          description: event.description,
+          isActive: event.isActive,
+          createdAt: event.createdAt,
+          updatedAt: event.updatedAt,
+          participantsCount: activeParticipants.length,
+        };
+      })
+    );
+
     const userObj = {
       // fields that are always visible
       _id: user._id,
+      isSameUser: isSameUser,
       username: user.username,
       profilePictureUrl: user.profilePictureUrl,
       role: user.role,
@@ -330,7 +367,7 @@ router.get("/:id", async (req, res) => {
         showEvents && user.role === ROLES.USER
           ? {
               show: true,
-              events: populatedUser.joinedEvents,
+              events: events,
             }
           : {
               show: false,
@@ -353,82 +390,6 @@ router.get("/:id", async (req, res) => {
     res.status(200).send({
       message: "User found successfully",
       user: userObj,
-    });
-  } catch (e: any) {
-    // handle errors
-    console.error(e);
-    res.status(400).send(e);
-  }
-});
-
-/**
- * @route get /api/users/:id/edit
- * :id = user's _id
- * finds a user in the database and sends information
- * to be edited
- * 
- * base64img has a size limit of ~5mb
- *
- * requirements:
- * - authorization: Bearer <access_token>
- * - user has to be the same as the user in the url
- *
- * results:
- * {
-      message: "User found successfully",
-      user: {
-        profilePictureUrl: string;
-        username: string;
-        firstName: string;
-        lastName: string;
-        email: string;
-        idCode: string;
-        faculty: string;
-        phoneNumber: string;
-        gender: string;
-        description: string;
-        interestedEventTypes: any[];
-      }
-    }
- */
-router.get("/:id/edit", checkAccessToken, checkSameUser, async (req, res) => {
-  // get id from url params
-  const id = req.params.id;
-
-  try {
-    // find a user with id
-    const user = await findAndPopulateUser(id, {
-      interestedEventTypes: true,
-    });
-
-    const interestedEventTypes = toArray(user.interestedEventTypes);
-
-    if (!user) {
-      res.status(404).send({
-        error: "User not found",
-      });
-      return;
-    }
-
-    const userJson = {
-      profilePictureUrl: user.profilePictureUrl,
-      username: user.username,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      idCode: user.idCode,
-      faculty: user.faculty,
-      phoneNumber: user.phoneNumber,
-      gender: user.gender,
-      description: user.description,
-      interestedEventTypes: interestedEventTypes.map(
-        (eventType) => eventType.name
-      ),
-    };
-
-    res.status(200).send({
-      message: "User found successfully",
-      user: userJson,
     });
   } catch (e: any) {
     // handle errors
@@ -513,6 +474,82 @@ router.post(
     }
   }
 );
+
+/**
+ * @route get /api/users/:id/edit
+ * :id = user's _id
+ * finds a user in the database and sends information
+ * to be edited
+ * 
+ * base64img has a size limit of ~5mb
+ *
+ * requirements:
+ * - authorization: Bearer <access_token>
+ * - user has to be the same as the user in the url
+ *
+ * results:
+ * {
+      message: "User found successfully",
+      user: {
+        profilePictureUrl: string;
+        username: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+        idCode: string;
+        faculty: string;
+        phoneNumber: string;
+        gender: string;
+        description: string;
+        interestedEventTypes: any[];
+      }
+    }
+ */
+router.get("/:id/edit", checkAccessToken, checkSameUser, async (req, res) => {
+  // get id from url params
+  const id = req.params.id;
+
+  try {
+    // find a user with id
+    const user = await findAndPopulateUser(id, {
+      interestedEventTypes: true,
+    });
+
+    const interestedEventTypes = toArray(user.interestedEventTypes);
+
+    if (!user) {
+      res.status(404).send({
+        error: "User not found",
+      });
+      return;
+    }
+
+    const userJson = {
+      profilePictureUrl: user.profilePictureUrl,
+      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      idCode: user.idCode,
+      faculty: user.faculty,
+      phoneNumber: user.phoneNumber,
+      gender: user.gender,
+      description: user.description,
+      interestedEventTypes: interestedEventTypes.map(
+        (eventType) => eventType.name
+      ),
+    };
+
+    res.status(200).send({
+      message: "User found successfully",
+      user: userJson,
+    });
+  } catch (e: any) {
+    // handle errors
+    console.error(e);
+    res.status(400).send(e);
+  }
+});
 
 /**
  * @route post /api/users/:id/edit

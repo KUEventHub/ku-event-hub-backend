@@ -1,5 +1,9 @@
 import { Router } from "express";
-import { checkAdminRole, checkAccessToken } from "../middleware/auth.ts";
+import {
+  checkAdminRole,
+  checkAccessToken,
+  checkUserRole,
+} from "../middleware/auth.ts";
 import { getEventTypesFromStrings } from "../services/eventtypes.ts";
 import { findUserWithAuth0Id, getAuth0Id } from "../services/users.ts";
 import {
@@ -12,6 +16,7 @@ import {
 } from "../services/events.ts";
 import { EVENT_SORT_TYPES } from "../helper/constants.ts";
 import { toArray } from "../services/mongoose.ts";
+import Participation from "../schema/Participation.ts";
 
 const router = Router();
 
@@ -227,6 +232,7 @@ router.post("/create", checkAccessToken, checkAdminRole, async (req, res) => {
           name: string,
           profilePictureUrl: string,
         }[]
+        userHasJoinedEvent: boolean,
       }
     }
  */
@@ -235,15 +241,31 @@ router.get("/:id", async (req, res) => {
   const id = req.params.id;
 
   try {
+    // find event
     const event = await findAndPopulateEvent(id, {
       participants: true,
       eventTypes: true,
     });
 
+    // find user (if signed in)
+    const token = req.get("Authorization");
+    const user = token ? await findUserWithAuth0Id(getAuth0Id(token)) : null;
+
+    // find active participants
     const participants = toArray(event.participants);
+    const activeParticipants = participants.filter(
+      (participation) => participation.isActive
+    );
     const eventTypes = toArray(event.eventTypes).map(
       (eventType) => eventType.name
     );
+
+    const userHasJoinedEvent = user
+      ? activeParticipants.find(
+          (participation) =>
+            participation.user._id.toString() === user._id.toString()
+        )
+      : false;
 
     const eventJson = {
       name: event.name,
@@ -254,16 +276,21 @@ router.get("/:id", async (req, res) => {
       endTime: event.endTime,
       location: event.location,
       totalSeats: event.totalSeats,
-      participantsCount: participants.length,
+      participantsCount: activeParticipants.length,
       description: event.description,
       isActive: event.isActive,
-      participants: participants.map((participation) => {
+      participants: activeParticipants.map((participation) => {
         return {
           _id: participation.user._id,
           name: participation.user.username,
           profilePictureUrl: participation.user.profilePictureUrl,
+          isSelf: user
+            ? user._id.toString() === participation.user._id.toString()
+            : false,
         };
       }),
+      // check if (signed in/self) user has joined this event
+      userHasJoinedEvent: Boolean(userHasJoinedEvent),
     };
 
     res.status(200).send({
@@ -455,6 +482,198 @@ router.post("/:id/edit", checkAccessToken, checkAdminRole, async (req, res) => {
 
     res.status(200).send({
       message: "Event updated successfully",
+    });
+  } catch (e: any) {
+    // handle errors
+    console.error(e);
+    res.status(400).send(e);
+  }
+});
+
+/**
+ * @route post /api/events/:id/join
+ * :id = event's _id
+ * joins an event
+ * 
+ * requirements:
+ * - authorization: Bearer <access_token>
+ * - params: {
+      id: string;
+    }
+ * 
+ * results:
+ * {
+      message: "Event joined successfully",
+      participation: participation._id,
+    }
+ * 
+ */
+router.post("/:id/join", checkUserRole, checkAccessToken, async (req, res) => {
+  // get id from url params
+  const id = req.params.id;
+
+  try {
+    // get user id from token
+    const token = req.get("Authorization");
+    const auth0id = getAuth0Id(token!);
+    const user = await findUserWithAuth0Id(auth0id);
+    if (!user) {
+      res.status(404).send({
+        error: "User not found",
+      });
+      return;
+    }
+
+    // find event with this id
+    const event = await findEventWithId(id);
+    if (!event) {
+      res.status(404).send({
+        error: "Event not found",
+      });
+      return;
+    }
+
+    // check if event is active
+    if (!event.isActive) {
+      res.status(400).send({
+        error: "Event is not active",
+      });
+      return;
+    }
+
+    // check if user already joined
+    await user.populate("joinedEvents");
+    const userParticipations = toArray(user.joinedEvents);
+    const joinedParticipations = userParticipations.filter((participation) => {
+      return (
+        // find participation with this event id
+        participation.event.toString() === event._id.toString() &&
+        // check if participation is active
+        participation.isActive
+      );
+    });
+
+    if (joinedParticipations.length > 0) {
+      res.status(400).send({
+        error: "User already joined this event",
+      });
+      return;
+    }
+
+    // check if event is full
+    if (joinedParticipations.length >= event.totalSeats) {
+      res.status(400).send({
+        error: "Event is full",
+      });
+      return;
+    }
+
+    // add participation
+    const participation = new Participation({
+      user: user._id,
+      event: event._id,
+    });
+
+    await participation.save();
+
+    // link participation to the event and the user
+    const eventParticipants = toArray(event.participants);
+    eventParticipants.push(participation._id);
+    await event.updateOne({
+      participants: eventParticipants,
+    });
+
+    user.depopulate("joinedEvents");
+    const userJoinedEvents = toArray(user.joinedEvents);
+    userJoinedEvents.push(participation._id);
+    await user.updateOne({
+      joinedEvents: userJoinedEvents,
+    });
+
+    res.status(200).send({
+      message: "Event joined successfully",
+      participation: participation._id,
+    });
+  } catch (e: any) {
+    // handle errors
+    console.error(e);
+    res.status(400).send(e);
+  }
+});
+
+/**
+ * @route post /api/events/:id/leave
+ * :id = event's _id
+ * leaves an event
+ * 
+ * requirements:
+ * - authorization: Bearer <access_token>
+ * - params: {
+      id: string;
+    }
+ * 
+ * results:
+ * {
+      message: "Event left successfully",
+    }
+ * 
+ */
+router.post("/:id/leave", checkUserRole, checkAccessToken, async (req, res) => {
+  // get id from url params
+  const id = req.params.id;
+
+  try {
+    // get user id from token
+    const token = req.get("Authorization");
+    const auth0id = getAuth0Id(token!);
+    const user = await findUserWithAuth0Id(auth0id);
+    if (!user) {
+      res.status(404).send({
+        error: "User not found",
+      });
+      return;
+    }
+
+    // find event with this id
+    const event = await findEventWithId(id);
+    if (!event) {
+      res.status(404).send({
+        error: "Event not found",
+      });
+      return;
+    }
+
+    // check if user already joined the event
+    await user.populate("joinedEvents");
+    const userParticipations = toArray(user.joinedEvents);
+    const joinedParticipations = userParticipations.filter((participation) => {
+      return (
+        // find participation with this event id
+        participation.event.toString() === event._id.toString() &&
+        // check if participation is active
+        participation.isActive
+      );
+    });
+
+    if (joinedParticipations.length <= 0) {
+      res.status(400).send({
+        error: "User hasn't joined this event",
+      });
+      return;
+    }
+
+    // deactivate participation
+    // safety measure - if there's SOMEHOW multiple active participations
+    // deactivate all of them
+    for (const participation of joinedParticipations) {
+      await participation.updateOne({
+        isActive: false,
+        updatedAt: Date.now(),
+      });
+    }
+
+    res.status(200).send({
+      message: "Event left successfully",
     });
   } catch (e: any) {
     // handle errors

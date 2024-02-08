@@ -24,3 +24,5 @@
 - `get` `/api/events/:id` get event information
 - `get` `/api/events/:id/edit` get event information for editing
 - `post` `/api/events/:id/edit` edit event information
+- `post` `/api/events/:id/join` join event
+- `post` `/api/events/:id/leave` leave event
