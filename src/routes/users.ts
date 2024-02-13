@@ -293,6 +293,13 @@ router.post("/login", checkAccessToken, async (req, res) => {
           // if show is false, this field is visible
           message: "User friends are private"";
         },
+        privacySettings: {
+          // if user is the same user in url, show these
+            showUserInformation: user.showUserInformation,
+            showEvents: user.showEvents,
+            showFriends: user.showFriends,
+          // otherwise, privacySettings = undefined (if sent, at all)
+        },
       }
     }
  */
@@ -427,6 +434,15 @@ router.get("/:id", async (req, res) => {
               show: false,
               message: "User friends are private",
             },
+
+      // privacy settings (only sent if user is the same as the user in the url)
+      privacySettings: isSameUser
+        ? {
+            showUserInformation: user.showUserInformation,
+            showEvents: user.showEvents,
+            showFriends: user.showFriends,
+          }
+        : undefined,
     };
 
     res.status(200).send({
