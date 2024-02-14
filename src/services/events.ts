@@ -1,11 +1,12 @@
 import { ObjectId } from "mongodb";
 import Event from "../schema/Event.ts";
-import { getEventTypesFromStrings } from "./eventtypes.ts";
 import { EVENT_SORT_TYPES, TABLES } from "../helper/constants.ts";
 import { encryptPassword } from "./bcrypt.ts";
-import { findUserWithAuth0Id, findUserWithId } from "./users.ts";
+import { findUserWithId } from "./users.ts";
 import { signIn, signOut, uploadEventPicture } from "./firebase.ts";
 import { toArray } from "./mongoose.ts";
+import { Expression, PipelineStage } from "mongoose";
+import { getEventTypesFromStrings } from "./eventtypes.ts";
 
 /**
  * Creates a new event, saves it to the database
@@ -35,9 +36,10 @@ export async function createEvent(event: {
 }
 
 /**
- * Finds an event in the database and returns it.
- * Also filters the event types.
- * Also populates event types after filtering.
+ * Get events for the main page
+ * has optional filter
+ * must sort, must paginate
+ * populates event types
  *
  * @param pageNumber page number
  * @param pageSize page size
@@ -54,27 +56,30 @@ export async function getEvents(filter: {
   sortType: number;
   sortActive: boolean;
 }) {
-  const matchJson: any = {};
-  const sortJson: any = {};
+  const eventName = filter.event.name?.toLowerCase();
 
-  // // filter out start time that was before now
-  // filterJson.$match = {
-  //   startTime: { $gt: new Date() },
-  // };
+  // fix participant number sort
 
-  // if there is a filter for event name
-  if (filter.event.name) {
-    matchJson.$match = {
-      ...matchJson.$match,
-      name: {
-        $regex: filter.event.name,
-      },
+  // init aggregate and stages
+  const aggregate: PipelineStage[] = [];
+  const matches: Record<string, any> = {};
+  const sorts: Record<string, 1 | -1 | Expression.Meta> = {};
+
+  // ? --- matching stage ---
+  // if the event name is given, add filter by name
+  if (eventName) {
+    matches.name = {
+      $regex: new RegExp(eventName, "i"), // case insensitive
     };
   }
+
   // if there is a filter for event types
   if (filter.event.eventTypes) {
+    // get event type ids
     const eventTypes = await getEventTypesFromStrings(filter.event.eventTypes);
 
+    // if event types are found with the included event types filter
+    // get its id and its children's ids
     if (eventTypes.length > 0) {
       const eventTypesIds = eventTypes.map((eventType) => eventType!._id);
       const childEventTypesIds = eventTypes.map(
@@ -87,41 +92,53 @@ export async function getEvents(filter: {
         ...childEventTypesIds,
       ].flat();
 
-      matchJson.$match = {
-        ...matchJson.$match,
-        eventTypes: {
-          $in: combinedEventTypesIds,
-        },
+      // add filter by event types
+      matches.eventTypes = {
+        $in: combinedEventTypesIds,
       };
     }
   }
 
-  let aggregate = [];
+  // ? --- sorting stage ---
+  // populate the participant field
+  const populateParticipantsStage = {
+    $lookup: {
+      from: TABLES.PARTICIPATION,
+      localField: "participants",
+      foreignField: "_id",
+      as: "participants",
+    },
+  };
+  // get the active participants amount
+  const activeParticipantsStage = {
+    $addFields: {
+      activeParticipants: {
+        $size: {
+          $filter: {
+            input: "$participants",
+            as: "participant",
+            cond: {
+              $eq: ["$$participant.isActive", true],
+            },
+          },
+        },
+      },
+    },
+  };
 
+  // sort events based on sort type
   switch (filter.sortType) {
     case EVENT_SORT_TYPES.MOST_RECENTLY_CREATED:
-      sortJson.$sort = {
-        ...sortJson.$sort,
-        createdAt: -1,
-      };
+      sorts.createdAt = -1;
       break;
     case EVENT_SORT_TYPES.MOST_RECENT_START_DATE:
-      sortJson.$sort = {
-        ...sortJson.$sort,
-        startTime: -1,
-      };
+      sorts.startTime = -1;
       break;
-    case EVENT_SORT_TYPES.MOST_PARTICIPANTS:
-      sortJson.$sort = {
-        ...sortJson.$sort,
-        participants: -1,
-      };
+    case EVENT_SORT_TYPES.MOST_PARTICIPANTS: // active participants
+      sorts.activeParticipants = -1;
       break;
-    case EVENT_SORT_TYPES.LEAST_PARTICIPANTS:
-      sortJson.$sort = {
-        ...sortJson.$sort,
-        participants: 1,
-      };
+    case EVENT_SORT_TYPES.LEAST_PARTICIPANTS: // active participants
+      sorts.activeParticipants = 1;
       break;
     default:
       throw new Error("Invalid sort type");
@@ -129,80 +146,88 @@ export async function getEvents(filter: {
 
   // if sortActive is true, put inactive events at the bottom
   if (filter.sortActive) {
-    sortJson.$sort = {
-      isActive: -1,
-      ...sortJson.$sort,
-    };
+    sorts.isActive = -1;
   }
 
-  // add match filter
-  if (matchJson.$match) {
-    aggregate.push(matchJson);
-  }
-  // add sort filter
-  if (sortJson.$sort) {
-    aggregate.push(sortJson);
-  }
+  // ? --- extra nifty stages --- please put inside pagination stage
+  // populate event types
+  const populateEventTypesStage = {
+    $lookup: {
+      from: TABLES.EVENT_TYPE,
+      localField: "eventTypes",
+      foreignField: "_id",
+      as: "eventTypes",
+    },
+  };
 
-  // add pagination
+  // ? --- pagination ---
+  const paginationStage = {
+    $facet: {
+      // pagination settings (where the events are actually returned)
+      data: [
+        {
+          $skip: (filter.pageNumber - 1) * filter.pageSize,
+        },
+        {
+          $limit: filter.pageSize,
+        },
+        populateEventTypesStage, // yes, inside the pagination, to do less work
+      ],
+      // extra information
+      info: [
+        {
+          $count: "count", // count how many items were found after filtering
+        },
+      ],
+    },
+  };
+
+  // ? --- add stages to aggregate ---
   aggregate.push({
-    $skip: (filter.pageNumber - 1) * filter.pageSize,
+    $match: matches,
   });
+  // yes, this means DO IT EVERY TIME AFTER FILTERING to EVERY ITEM
+  // god only if i had a better way to do this
+  aggregate.push(populateParticipantsStage);
+  aggregate.push(activeParticipantsStage);
   aggregate.push({
-    $limit: filter.pageSize,
+    $sort: sorts,
   });
+  // add pagination via facet (so that the count stage doesn't consume everything)
+  aggregate.push(paginationStage);
 
-  const events = await Event.aggregate(aggregate);
+  try {
+    const events = await Event.aggregate(aggregate);
+    // yes, facet is janky, so we need to format the data
+    const formattedEvents = events[0].data.map((event: any) => {
+      return {
+        _id: event._id,
+        name: event.name,
+        imageUrl: event.imageUrl,
+        activityHours: event.activityHours,
+        totalSeats: event.totalSeats,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        location: event.location,
+        description: event.description,
+        isActive: event.isActive,
+        participantsCount: event.activeParticipants, // active participants
+        eventTypes: event.eventTypes,
+      };
+    });
 
-  // console.log(events);
-
-  const modifiedEvents = events.map(async (event) => {
-    const eventObj = await findEventWithId(event._id);
-
-    if (!eventObj) {
-      throw new Error("Event not found");
-    }
-
-    await eventObj.populate("participants");
-    await eventObj.populate("eventTypes");
-    const eventTypes = toArray(eventObj.eventTypes);
-
-    const participants = toArray(eventObj.participants);
-    const activeParticipants = participants.filter(
-      (participant) => participant.isActive
-    );
-
-    const returnObj = {
-      ...eventObj,
-      eventTypes: eventTypes,
-      participantsCount: activeParticipants.length,
+    const returnData = {
+      events: formattedEvents,
+      count: events[0].info[0].count,
     };
-
-    return returnObj;
-  });
-
-  const promisedEvents = await Promise.all(modifiedEvents);
-
-  const formattedPromisedEvents = promisedEvents.map((event: any) => {
-    const doc = event._doc;
-
+    return returnData;
+  } catch (e) {
+    // if there is an error, just return an empty array
     return {
-      _id: doc._id,
-      name: doc.name,
-      imageUrl: doc.imageUrl,
-      activityHours: doc.activityHours,
-      totalSeats: doc.totalSeats,
-      startTime: doc.startTime,
-      endTime: doc.endTime,
-      location: doc.location,
-      description: doc.description,
-      isActive: doc.isActive,
-      participantsCount: event.participantsCount,
-      eventTypes: event.eventTypes,
+      events: [],
+      count: 0,
     };
-  });
-
-  return formattedPromisedEvents;
+  }
 }
 
 /**

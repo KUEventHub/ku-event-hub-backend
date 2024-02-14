@@ -40,6 +40,7 @@ const router = Router();
       pageSize,
       noPages,
       events,
+      totalCount,
     }
  */
 router.get("/", async (req, res) => {
@@ -72,13 +73,14 @@ router.get("/", async (req, res) => {
       sortActive,
     });
 
-    const noPages = Math.ceil(events.length / pageSize);
+    const noPages = Math.ceil(events.count / pageSize);
 
     res.status(200).send({
       pageNumber,
       pageSize,
       noPages,
-      events,
+      events: events.events,
+      totalCount: events.count,
     });
   } catch (e: any) {
     // handle error
