@@ -33,3 +33,5 @@
 - `get` `/api/friend-requests/received` get received friend requests
 - `get` `/api/friend-requests/sent` get sent friend requests
 - `post` `/api/friend-requests/add` send a friend request
+- `post` `/api/friend-requests/:id/accept` accept a friend request
+- `post` `/api/friend-requests/:id/reject` reject a friend request
