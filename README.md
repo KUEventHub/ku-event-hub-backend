@@ -35,3 +35,7 @@
 - `post` `/api/friend-requests/add` send a friend request
 - `post` `/api/friend-requests/:id/accept` accept a friend request
 - `post` `/api/friend-requests/:id/reject` reject a friend request
+
+#### admin `/api/admin`
+
+- `get` `/api/admin/user-list` get user list

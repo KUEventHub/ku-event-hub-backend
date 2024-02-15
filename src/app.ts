@@ -7,6 +7,7 @@ import cors from "cors";
 import { userRouter } from "./routes/users.ts";
 import { eventRouter } from "./routes/events.ts";
 import { friendRequestRouter } from "./routes/friendRequests.ts";
+import { adminRouter } from "./routes/admin.ts";
 
 // init models and schemas
 import "./schema/User.ts";
@@ -18,6 +19,8 @@ import "./schema/FriendRequest.ts";
 
 // init firebase
 import "./services/firebase.ts";
+
+// services
 import { checkActiveEvents } from "./services/events.ts";
 
 const app = express();
@@ -36,6 +39,9 @@ app.use("/api/events", eventRouter);
 
 // friend requests route
 app.use("/api/friend-requests", friendRequestRouter);
+
+// admin route
+app.use("/api/admin", adminRouter);
 
 app.listen(port, () => {
   console.log(`[server]: Server is running at http://localhost:${port}`);

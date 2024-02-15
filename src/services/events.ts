@@ -4,7 +4,6 @@ import { EVENT_SORT_TYPES, TABLES } from "../helper/constants.ts";
 import { encryptPassword } from "./bcrypt.ts";
 import { findUserWithId } from "./users.ts";
 import { signIn, signOut, uploadEventPicture } from "./firebase.ts";
-import { toArray } from "./mongoose.ts";
 import { Expression, PipelineStage } from "mongoose";
 import { getEventTypesFromStrings } from "./eventtypes.ts";
 
