@@ -1,9 +1,12 @@
 import express from "express";
 import "./services/mongoose.ts"; // connect to MongoDB and Mongoose
 import "dotenv/config"; // config from .env
+import cors from "cors";
+
+// routers
 import { userRouter } from "./routes/users.ts";
 import { eventRouter } from "./routes/events.ts";
-import cors from "cors";
+import { friendRequestRouter } from "./routes/friendRequests.ts";
 
 // init models and schemas
 import "./schema/User.ts";
@@ -30,6 +33,9 @@ app.use("/api/users", userRouter);
 
 // events route
 app.use("/api/events", eventRouter);
+
+// friend requests route
+app.use("/api/friend-requests", friendRequestRouter);
 
 app.listen(port, () => {
   console.log(`[server]: Server is running at http://localhost:${port}`);

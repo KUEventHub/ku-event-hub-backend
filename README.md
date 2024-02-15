@@ -27,3 +27,9 @@
 - `post` `/api/events/:id/edit` edit event information
 - `post` `/api/events/:id/join` join event
 - `post` `/api/events/:id/leave` leave event
+
+#### friend requests `/api/friend-requests`
+
+- `get` `/api/friend-requests/received` get received friend requests
+- `get` `/api/friend-requests/sent` get sent friend requests
+- `post` `/api/friend-requests/add` send a friend request

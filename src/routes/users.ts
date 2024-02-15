@@ -295,11 +295,19 @@ router.post("/login", checkAccessToken, async (req, res) => {
         },
         privacySettings: {
           // if user is the same user in url, show these
-            showUserInformation: user.showUserInformation,
-            showEvents: user.showEvents,
-            showFriends: user.showFriends,
+            showUserInformation: boolean,
+            showEvents: boolean,
+            showFriends: boolean,
           // otherwise, privacySettings = undefined (if sent, at all)
         },
+        friendsInformation: {
+          // if user is logged in, and is not the same user as the user in the url
+          // show these
+          isFriend: boolean,
+          hasOutgoingFriendRequest: boolean,
+          hasReceivedFriendRequest: boolean,
+          // otherwise, friendsInformation = undefined (if sent, at all)
+        }
       }
     }
  */
@@ -311,7 +319,10 @@ router.get("/:id", async (req, res) => {
     // token
     const token = req.get("Authorization");
     let isSameUser: boolean;
-    let auth0User;
+    let isLoggedIn: boolean;
+    let isFriend: boolean;
+    let hasOutgoingFriendRequest: boolean; // check if logged in user sent a fq to the user in the url
+    let hasReceivedFriendRequest: boolean; // check if logged in user received a fq from the user in the url
 
     // find a user with id
     const user = await findUserWithId(id);
@@ -323,12 +334,14 @@ router.get("/:id", async (req, res) => {
       return;
     }
 
+    // check if user is the same as the user in the url
     if (!token) {
       isSameUser = false;
+      isLoggedIn = false;
     } else {
       const auth0id = getAuth0Id(token!);
 
-      auth0User = await findUserWithAuth0Id(auth0id);
+      const auth0User = await findUserWithAuth0Id(auth0id);
 
       if (!auth0User) {
         res.status(404).send({
@@ -338,6 +351,41 @@ router.get("/:id", async (req, res) => {
       }
 
       isSameUser = user._id.toString() === auth0User._id.toString();
+      isLoggedIn = true;
+
+      if (!isSameUser) {
+        // check if logged in user is friends with the user in the url
+        isFriend = toArray(auth0User.friends).some(
+          (friendId) => friendId.toString() === user._id.toString()
+        );
+
+        // don't check anything else if they're already friends
+        // waste of time to check requests
+        if (isFriend) {
+          hasOutgoingFriendRequest = false;
+          hasReceivedFriendRequest = false;
+        } else {
+          // check if logged in user has an ongoing friend request with the user in the url
+          await auth0User.populate("sentFriendRequests");
+          const sentFriendRequests = toArray(auth0User.sentFriendRequests);
+          hasOutgoingFriendRequest = sentFriendRequests.some(
+            (friendRequest) =>
+              friendRequest.to.toString() === user._id.toString() &&
+              !friendRequest.isResponded
+          );
+
+          // check if logged in user has received a friend request from the user in the url
+          await auth0User.populate("receivedFriendRequests");
+          const receivedFriendRequests = toArray(
+            auth0User.receivedFriendRequests
+          );
+          hasReceivedFriendRequest = receivedFriendRequests.some(
+            (friendRequest) =>
+              friendRequest.from.toString() === user._id.toString() &&
+              !friendRequest.isResponded
+          );
+        }
+      }
     }
 
     // get privacy settings from user
@@ -367,9 +415,14 @@ router.get("/:id", async (req, res) => {
           (participation) => participation.isActive
         );
 
+        // find event types
+        await event.populate("eventTypes");
+        const eventTypes = toArray(event.eventTypes);
+
         return {
           _id: event._id,
           name: event.name,
+          eventTypes: eventTypes.map((eventType) => eventType.name),
           imageUrl: event.imageUrl,
           activityHours: event.activityHours,
           totalSeats: event.totalSeats,
@@ -443,6 +496,19 @@ router.get("/:id", async (req, res) => {
             showFriends: user.showFriends,
           }
         : undefined,
+
+      // friends information (only sent if user is logged in
+      // and is not the same user as the user in the url)
+      friendsInformation:
+        isLoggedIn && !isSameUser
+          ? {
+              // these fields will have a value if user is logged in
+              // and is not the same user as the user in the url
+              isFriend: isFriend!,
+              hasOutgoingFriendRequest: hasOutgoingFriendRequest!,
+              hasReceivedFriendRequest: hasReceivedFriendRequest!,
+            }
+          : undefined,
     };
 
     res.status(200).send({

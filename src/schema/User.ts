@@ -132,18 +132,20 @@ const schema = new Schema({
     default: [],
     ref: TABLES.USER,
   },
-  // receivedFriendRequests: {
-  //   // friend requests user received
-  //   // `FriendRequest` ObjectId
-  //   type: Array<mongoose.Types.ObjectId>,
-  //   default: [],
-  // },
-  // sentFriendRequests: {
-  //   // friend requests user sent
-  //   // `FriendRequest` ObjectId
-  //   type: Array<mongoose.Types.ObjectId>,
-  //   default: [],
-  // },
+  receivedFriendRequests: {
+    // friend requests user received
+    // `FriendRequest` ObjectId
+    type: Array<mongoose.Types.ObjectId>,
+    ref: TABLES.FRIEND_REQUEST,
+    default: [],
+  },
+  sentFriendRequests: {
+    // friend requests user sent
+    // `FriendRequest` ObjectId
+    type: Array<mongoose.Types.ObjectId>,
+    ref: TABLES.FRIEND_REQUEST,
+    default: [],
+  },
   ban: {
     // ban status
     // `BanLog` ObjectId
