@@ -21,6 +21,11 @@ const schema = new Schema({
     type: Date,
     default: Date.now,
   },
+  expiresAt: {
+    // the time when the ban will expire
+    type: Date,
+    required: [true, getMissingAttributeString("expiresAt")],
+  },
 
   // references
   bannedUser: {

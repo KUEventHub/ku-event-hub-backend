@@ -21,6 +21,11 @@ const schema = new Schema({
     type: Boolean,
     default: null,
   },
+  isCancelled: {
+    // whether the friend request is cancelled or not
+    type: Boolean,
+    default: false,
+  },
 
   // references
   from: {

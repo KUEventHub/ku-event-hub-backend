@@ -53,7 +53,8 @@ router.get("/received", checkAccessToken, checkUserRole, async (req, res) => {
     const receivedFriendRequests = toArray(user.receivedFriendRequests).filter(
       // only return unresponded requests
       // no point in returning responded requests
-      (friendRequest) => !friendRequest.isResponded
+      (friendRequest) =>
+        !friendRequest.isResponded && !friendRequest.isCancelled
     );
 
     const requests = receivedFriendRequests.map((request) => {
@@ -124,7 +125,8 @@ router.get("/sent", checkAccessToken, checkUserRole, async (req, res) => {
     const sentFriendRequests = toArray(user.sentFriendRequests).filter(
       // only return unresponded requests
       // no point in returning responded requests
-      (friendRequest) => !friendRequest.isResponded
+      (friendRequest) =>
+        !friendRequest.isResponded && !friendRequest.isCancelled
     );
 
     const requests = sentFriendRequests.map((request) => {
@@ -358,6 +360,14 @@ router.post(
         return;
       }
 
+      // check if friend request is already cancelled
+      if (friendRequest.isCancelled) {
+        res.status(400).send({
+          error: "This friend request has already been cancelled",
+        });
+        return;
+      }
+
       // check if you are already friends with the user
       const friendIds = toArray(currentUser.friends);
       const isAlreadyFriend = friendIds.some(
@@ -473,6 +483,14 @@ router.post(
         return;
       }
 
+      // check if friend request is already cancelled
+      if (friendRequest.isCancelled) {
+        res.status(400).send({
+          error: "This friend request has already been cancelled",
+        });
+        return;
+      }
+
       // check if you are already friends with the user
       const friendIds = toArray(currentUser.friends);
       const isAlreadyFriend = friendIds.some(
@@ -503,6 +521,112 @@ router.post(
 
       res.status(200).send({
         message: "Friend request rejected",
+      });
+    } catch (e: any) {
+      // handle errors
+      console.error(e);
+      res.status(400).send(e);
+    }
+  }
+);
+
+/**
+ * @route get /api/friend-requests/:id/cancel
+ * cancel a friend request
+ *
+ * requirements:
+ * - :id -> friend request id
+ * - user must be logged in
+ * - user must have user role
+ *
+ * results:
+ * {
+      message: "Friend request cancelled",
+    }
+ */
+router.post(
+  "/:id/cancel",
+  checkAccessToken,
+  checkUserRole,
+  async (req, res) => {
+    const id = req.params.id;
+    try {
+      // get logged in user
+      const token = req.get("Authorization");
+      const auth0id = getAuth0Id(token!);
+      const currentUser = await findUserWithAuth0Id(auth0id);
+
+      if (!currentUser) {
+        res.status(404).send({
+          error: "User not found",
+        });
+        return;
+      }
+
+      // find friend request
+      const friendRequest = await FriendRequest.findById(id);
+
+      if (!friendRequest) {
+        res.status(404).send({
+          error: "Friend request not found",
+        });
+        return;
+      }
+
+      // check if the friend request is for the current user
+      if (friendRequest.to.toString() !== currentUser._id.toString()) {
+        res.status(400).send({
+          error: "This friend request is not for you",
+        });
+        return;
+      }
+
+      // check if friend request is already responded
+      if (friendRequest.isResponded) {
+        res.status(400).send({
+          error: "This friend request has already been responded",
+        });
+        return;
+      }
+
+      // check if friend request is already cancelled
+      if (friendRequest.isCancelled) {
+        res.status(400).send({
+          error: "This friend request has already been cancelled",
+        });
+        return;
+      }
+
+      // check if you are already friends with the user
+      const friendIds = toArray(currentUser.friends);
+      const isAlreadyFriend = friendIds.some(
+        (friendId) => friendId.toString() === friendRequest.from.toString()
+      );
+
+      if (isAlreadyFriend) {
+        res.status(400).send({
+          error: "You are already friends with this user",
+        });
+        return;
+      }
+
+      // find the target user
+      const targetUser = await User.findById(friendRequest.from);
+      if (!targetUser) {
+        res.status(404).send({
+          error: "Target user not found",
+        });
+        return;
+      }
+
+      // accept the friend request
+      friendRequest.isResponded = true;
+      friendRequest.isCancelled = true;
+      friendRequest.updatedAt = new Date();
+      await friendRequest.save();
+
+      res.status(200).send({
+        message: "Friend request cancelled",
       });
     } catch (e: any) {
       // handle errors
