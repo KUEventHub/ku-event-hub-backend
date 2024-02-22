@@ -894,6 +894,14 @@ router.post(
         return;
       }
 
+      // check if event is already deactivated
+      if (event.isDeactivated) {
+        res.status(400).send({
+          error: "Event has already been deactivated",
+        });
+        return;
+      }
+
       // deactivate event
       await event.updateOne({
         isActive: false,
