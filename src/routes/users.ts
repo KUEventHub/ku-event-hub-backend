@@ -319,6 +319,7 @@ router.get("/:id", async (req, res) => {
     // token
     const token = req.get("Authorization");
     let isSameUser: boolean;
+    let isAdmin: boolean;
     let isLoggedIn: boolean;
     let isFriend: boolean;
     let hasOutgoingFriendRequest: boolean; // check if logged in user sent a fq to the user in the url
@@ -338,6 +339,7 @@ router.get("/:id", async (req, res) => {
     if (!token) {
       isSameUser = false;
       isLoggedIn = false;
+      isAdmin = false;
     } else {
       const auth0id = getAuth0Id(token!);
 
@@ -352,6 +354,7 @@ router.get("/:id", async (req, res) => {
 
       isSameUser = user._id.toString() === auth0User._id.toString();
       isLoggedIn = true;
+      isAdmin = auth0User.role === ROLES.ADMIN;
 
       if (!isSameUser) {
         // check if logged in user is friends with the user in the url
@@ -389,9 +392,10 @@ router.get("/:id", async (req, res) => {
     }
 
     // get privacy settings from user
-    const showUserInformation = isSameUser || user.showUserInformation;
-    const showEvents = isSameUser || user.showEvents;
-    const showFriends = isSameUser || user.showFriends;
+    const showUserInformation =
+      isSameUser || isAdmin || user.showUserInformation;
+    const showEvents = isSameUser || isAdmin || user.showEvents;
+    const showFriends = isSameUser || isAdmin || user.showFriends;
 
     const populatedUser = await findAndPopulateUser(id, {
       joinedEvents: showEvents,
@@ -438,6 +442,8 @@ router.get("/:id", async (req, res) => {
       })
     );
 
+    const friends = showFriends ? toArray(populatedUser.friends) : [];
+
     const userObj = {
       // fields that are always visible
       _id: user._id,
@@ -481,7 +487,13 @@ router.get("/:id", async (req, res) => {
         showFriends && user.role === ROLES.USER
           ? {
               show: true,
-              friends: populatedUser.friends,
+              friends: friends.map((user) => {
+                return {
+                  _id: user._id,
+                  username: user.username,
+                  profilePictureUrl: user.profilePictureUrl,
+                };
+              }),
             }
           : {
               show: false,
