@@ -19,8 +19,6 @@ import { toArray } from "../services/mongoose.ts";
 import Participation from "../schema/Participation.ts";
 import QRCode from "qrcode";
 import { decryptSymmetric, encryptSymmetric } from "../helper/crypto.ts";
-import Jimp from "jimp";
-import jsQR from "jsqr";
 import { checkQrcode } from "../helper/qrcode.ts";
 
 const router = Router();
@@ -299,8 +297,6 @@ router.post("/check-qrcode", checkAccessToken, async (req, res) => {
       qrcodeString,
       event.qrCodeIv
     );
-
-    console.log(decryptedText);
 
     const decryptedTextArray = decryptedText.split("|");
     const decryptedEventId = decryptedTextArray[0];
@@ -882,5 +878,110 @@ router.post(
   }
 );
 
+/**
+ * @route post /api/events/:id/verify
+ * :id = event's _id
+ * verifies a participation when scanning a qr code
+ *
+ * requirements:
+ * - authorization
+ * - auth0 role: user
+ * - body: {
+      qrCodeString: string;
+    }
+ * results:
+ * {
+        message: "Participation confirmed successfully",
+      }
+ */
+router.post(
+  "/:id/verify",
+  checkAccessToken,
+  checkUserRole,
+  async (req, res) => {
+    // get id from url params
+    const id = req.params.id;
+    const body: {
+      qrCodeString: string;
+    } = req.body;
+
+    try {
+      // get user id from token
+      const token = req.get("Authorization");
+      const auth0id = getAuth0Id(token!);
+      const user = await findUserWithAuth0Id(auth0id);
+
+      if (!user) {
+        res.status(404).send({
+          error: "User not found",
+        });
+        return;
+      }
+
+      // find event with this id
+      const event = await findEventWithId(id);
+
+      if (!event) {
+        res.status(404).send({
+          error: "Event not found",
+        });
+        return;
+      }
+
+      // check if user already joined the event
+      await user.populate("joinedEvents");
+      const userParticipations = toArray(user.joinedEvents);
+      const participation = userParticipations.find((participation) => {
+        return (
+          // find participation event id with this event id
+          participation.event.toString() === event._id.toString() &&
+          // check if participation is active
+          participation.isActive
+        );
+      });
+
+      if (!participation) {
+        res.status(400).send({
+          error: "User hasn't joined this event",
+        });
+        return;
+      }
+
+      if (participation.isConfirmed) {
+        res.status(400).send({
+          error: "User has already confirmed participation",
+        });
+        return;
+      }
+
+      // check the qr code given
+      const bodyQrcodeString = await checkQrcode(body.qrCodeString);
+      const eventQrcodeString = await checkQrcode(event.qrCodeString);
+
+      console.log(bodyQrcodeString, eventQrcodeString);
+
+      if (!bodyQrcodeString) {
+        res.status(400).send({
+          error: "Invalid QR Code",
+        });
+        return;
+      }
+
+      // confirm participation
+      await participation.updateOne({
+        isConfirmed: true,
+        updatedAt: Date.now(),
+      });
+
+      res.status(200).send({
+        message: "Participation confirmed successfully",
+      });
+    } catch (e: any) {
+      // handle errors
+      console.error(e);
+      res.status(400).send(e);
+    }
+  }
+);
 
 export { router as eventRouter };
