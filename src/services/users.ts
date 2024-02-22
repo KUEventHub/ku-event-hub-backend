@@ -1,7 +1,7 @@
 import { jwtDecode } from "jwt-decode";
 import User from "../schema/User.ts";
 import { ObjectId } from "mongodb";
-import { encryptPassword } from "./crypto.ts";
+import { encryptPassword } from "../helper/crypto.ts";
 import { signIn, signOut, uploadProfilePicture } from "./firebase.ts";
 
 /**

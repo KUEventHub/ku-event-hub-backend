@@ -22,6 +22,7 @@
 
 - `get` `/api/events/` get events
 - `post` `/api/events/create` create event
+- `post` `/api/events/check-qrcode` check qr code
 - `get` `/api/events/:id` get event information
 - `get` `/api/events/:id/edit` get event information for editing
 - `post` `/api/events/:id/edit` edit event information

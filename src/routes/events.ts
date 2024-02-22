@@ -18,7 +18,10 @@ import { EVENT_SORT_TYPES } from "../helper/constants.ts";
 import { toArray } from "../services/mongoose.ts";
 import Participation from "../schema/Participation.ts";
 import QRCode from "qrcode";
-import { encryptSymmetric } from "../services/crypto.ts";
+import { decryptSymmetric, encryptSymmetric } from "../helper/crypto.ts";
+import Jimp from "jimp";
+import jsQR from "jsqr";
+import { checkQrcode } from "../helper/qrcode.ts";
 
 const router = Router();
 
@@ -201,6 +204,120 @@ router.post("/create", checkAccessToken, checkAdminRole, async (req, res) => {
     });
   } catch (e: any) {
     // handle error
+    console.error(e);
+    res.status(400).send(e);
+  }
+});
+
+/**
+ * @route post /api/events/check-qrcode
+ * :id = event's _id
+ * checks a qr code for an event
+ *
+ * requirements:
+ * - authorization
+ * - body: {
+    eventId: string;
+    qrCodeString: string;
+  }
+ * results:
+ * {
+      message: "QR Code checked successfully",
+      results: {
+        isValid,
+        eventId, // shown if valid
+        createdAt, // shown if valid
+      },
+    }
+ *
+ *
+ */
+router.post("/check-qrcode", checkAccessToken, async (req, res) => {
+  // get id from url params
+  const body: {
+    eventId: string;
+    qrCodeString: string;
+  } = req.body;
+
+  try {
+    // get user id from token
+    const token = req.get("Authorization");
+    const auth0id = getAuth0Id(token!);
+    const user = await findUserWithAuth0Id(auth0id);
+
+    if (!user) {
+      res.status(404).send({
+        error: "User not found",
+      });
+      return;
+    }
+
+    // find event with this id
+    const event = await findEventWithId(body.eventId);
+
+    if (!event) {
+      res.status(404).send({
+        error: "Event not found",
+      });
+      return;
+    }
+
+    // check if there's a qr code
+    if (!event.qrCodeString) {
+      res.status(400).send({
+        error: "Event QR Code not found",
+      });
+      return;
+    }
+
+    // convert data uri qr code to image
+    // then decode the image
+    const qrcodeString = await checkQrcode(body.qrCodeString);
+
+    if (!qrcodeString) {
+      res.status(200).send({
+        message: "QR Code checked successfully",
+        results: {
+          isValid: false,
+        },
+      });
+      return;
+    }
+
+    // decrypt text string gotten from the decoded image
+    const qrcodeEncryptionKey = process.env.QRCODE_ENCRYPTION_KEY;
+
+    if (!qrcodeEncryptionKey) {
+      res.status(500).send({
+        error: "QR Code Encryption Key not found",
+      });
+      return;
+    }
+
+    const decryptedText = decryptSymmetric(
+      qrcodeEncryptionKey,
+      qrcodeString,
+      event.qrCodeIv
+    );
+
+    console.log(decryptedText);
+
+    const decryptedTextArray = decryptedText.split("|");
+    const decryptedEventId = decryptedTextArray[0];
+    const decryptedTimestamp = new Date(parseInt(decryptedTextArray[1]));
+
+    const isValid = decryptedEventId === event._id.toString();
+
+    res.status(200).send({
+      message: "QR Code checked successfully",
+      results: {
+        isValid: isValid,
+        eventId: decryptedEventId,
+        createdAt: decryptedTimestamp,
+      },
+    });
+  } catch (e: any) {
+    // handle errors
     console.error(e);
     res.status(400).send(e);
   }
@@ -750,6 +867,7 @@ router.post(
       await event.updateOne({
         qrCodeString,
         qrCodeIv: cipher.iv,
+        updatedAt: Date.now(),
       });
 
       res.status(200).send({
@@ -763,5 +881,6 @@ router.post(
     }
   }
 );
+
 
 export { router as eventRouter };
