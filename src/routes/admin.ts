@@ -2,7 +2,6 @@ import { Router } from "express";
 import { checkAccessToken, checkAdminRole } from "../middleware/auth.ts";
 import User from "../schema/User.ts";
 import { ROLES, TABLES } from "../helper/constants.ts";
-import LoginLog from "../schema/LoginLog.ts";
 
 const router = Router();
 
@@ -57,12 +56,6 @@ router.get("/user-list", checkAccessToken, checkAdminRole, async (req, res) => {
           // pagination settings (where the events are actually returned)
           data: [
             {
-              $skip: (pageNumber - 1) * pageSize,
-            },
-            {
-              $limit: pageSize,
-            },
-            {
               $lookup: {
                 from: TABLES.LOGIN_LOG,
                 localField: "_id",
@@ -85,15 +78,23 @@ router.get("/user-list", checkAccessToken, checkAdminRole, async (req, res) => {
               $group: {
                 _id: "$_id",
                 username: { $first: "$username" },
+                role: { $first: "$role" },
                 firstName: { $first: "$firstName" },
                 lastName: { $first: "$lastName" },
+                profilePictureUrl: { $first: "$profilePictureUrl" },
                 email: { $first: "$email" },
                 loginTime: {
                   $first: {
-                    $ifNull: ["$loginLog.time", "No login log"], // provide a default value if there's no login log
+                    $ifNull: ["$loginLog.time", "$createdAt", new Date(0)], // provide a default value if there's no login log
                   },
                 },
               },
+            },
+            {
+              $skip: (pageNumber - 1) * pageSize,
+            },
+            {
+              $limit: pageSize,
             },
           ],
           // extra information
