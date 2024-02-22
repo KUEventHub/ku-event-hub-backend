@@ -44,6 +44,12 @@ const schema = new Schema({
     type: Boolean,
     default: true,
   },
+  isDeactivated: {
+    // whether this event has been deactivated
+    // (hidden from main page)
+    type: Boolean,
+    default: false,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

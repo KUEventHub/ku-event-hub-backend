@@ -52,6 +52,7 @@ export async function getEvents(filter: {
     name?: string;
     eventTypes?: string[];
   };
+  includeDeactivatedEvents: boolean;
   sortType: number;
   sortActive: boolean;
 }) {
@@ -96,6 +97,13 @@ export async function getEvents(filter: {
         $in: combinedEventTypesIds,
       };
     }
+  }
+
+  // don't match deactivated events
+  if (!filter.includeDeactivatedEvents) {
+    matches.isDeactivated = {
+      $eq: false,
+    };
   }
 
   // ? --- sorting stage ---

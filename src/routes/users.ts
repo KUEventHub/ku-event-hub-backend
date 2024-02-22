@@ -409,7 +409,8 @@ router.get("/:id", async (req, res) => {
         // find event
         const event = await findEventWithId(participations.event);
 
-        if (!event) {
+        // don't show deactivated events
+        if (!event || event.isDeactivated) {
           return null;
         }
 

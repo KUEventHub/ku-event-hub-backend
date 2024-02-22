@@ -72,6 +72,7 @@ router.get("/", async (req, res) => {
         name: eventName,
         eventTypes: eventType ? [eventType] : [],
       },
+      includeDeactivatedEvents: false,
       sortType,
       sortActive,
     });
@@ -268,6 +269,14 @@ router.post("/check-qrcode", checkAccessToken, async (req, res) => {
       return;
     }
 
+    // check if event is deactivated
+    if (event.isDeactivated) {
+      res.status(400).send({
+        error: "Event has been deactivated",
+      });
+      return;
+    }
+
     // convert data uri qr code to image
     // then decode the image
     const qrcodeString = await checkQrcode(body.qrCodeString);
@@ -364,6 +373,21 @@ router.get("/:id", async (req, res) => {
       eventTypes: true,
     });
 
+    if (!event) {
+      res.status(404).send({
+        error: "Event not found",
+      });
+      return;
+    }
+
+    // check if event is deactivated
+    if (event.isDeactivated) {
+      res.status(400).send({
+        error: "Event has been deactivated",
+      });
+      return;
+    }
+
     // find user (if signed in)
     const token = req.get("Authorization");
     const user = token ? await findUserWithAuth0Id(getAuth0Id(token)) : null;
@@ -455,6 +479,21 @@ router.get("/:id/edit", checkAccessToken, checkAdminRole, async (req, res) => {
     const event = await findAndPopulateEvent(id, {
       eventTypes: true,
     });
+
+    if (!event) {
+      res.status(404).send({
+        error: "Event not found",
+      });
+      return;
+    }
+
+    // check if event is deactivated
+    if (event.isDeactivated) {
+      res.status(400).send({
+        error: "Event has been deactivated",
+      });
+      return;
+    }
 
     const eventTypes = toArray(event.eventTypes).map(
       (eventType) => eventType.name
@@ -561,6 +600,14 @@ router.post("/:id/edit", checkAccessToken, checkAdminRole, async (req, res) => {
       return;
     }
 
+    // check if event is deactivated
+    if (event.isDeactivated) {
+      res.status(400).send({
+        error: "Event has been deactivated",
+      });
+      return;
+    }
+
     // get event types ids
     const eventTypes = body.event.eventTypes
       ? await getEventTypesFromStrings(body.event.eventTypes)
@@ -654,6 +701,14 @@ router.post("/:id/join", checkUserRole, checkAccessToken, async (req, res) => {
     if (!event.isActive) {
       res.status(400).send({
         error: "Event is not active",
+      });
+      return;
+    }
+
+    // check if event has been deactivated
+    if (event.isDeactivated) {
+      res.status(400).send({
+        error: "Event has been deactivated",
       });
       return;
     }
@@ -760,6 +815,14 @@ router.post("/:id/leave", checkUserRole, checkAccessToken, async (req, res) => {
       return;
     }
 
+    // check if event is deactivated
+    if (event.isDeactivated) {
+      res.status(400).send({
+        error: "Event has been deactivated",
+      });
+      return;
+    }
+
     // check if user already joined the event
     await user.populate("joinedEvents");
     const userParticipations = toArray(user.joinedEvents);
@@ -800,6 +863,56 @@ router.post("/:id/leave", checkUserRole, checkAccessToken, async (req, res) => {
 });
 
 /**
+ * @route post /api/events/:id/deactivate
+ * :id = event's _id
+ * deactivates an event
+ *
+ * requirements:
+ * - authorization: Bearer <access_token>
+ * - auth0 role: Admin
+ *
+ * results:
+ * {
+        message: "Event deactivated successfully",
+      }
+ */
+router.post(
+  "/:id/deactivate",
+  checkAccessToken,
+  checkAdminRole,
+  async (req, res) => {
+    // get id from url params
+    const id = req.params.id;
+
+    try {
+      // find event with this id
+      const event = await findEventWithId(id);
+      if (!event) {
+        res.status(404).send({
+          error: "Event not found",
+        });
+        return;
+      }
+
+      // deactivate event
+      await event.updateOne({
+        isActive: false,
+        isDeactivated: true,
+        updatedAt: Date.now(),
+      });
+
+      res.status(200).send({
+        message: "Event deactivated successfully",
+      });
+    } catch (e: any) {
+      // handle errors
+      console.error(e);
+      res.status(400).send(e);
+    }
+  }
+);
+
+/**
  * @route post /api/events/:id/qrcode
  * :id = event's _id
  * creates a qr code for an event
@@ -829,6 +942,14 @@ router.post(
       if (!event) {
         res.status(404).send({
           error: "Event not found",
+        });
+        return;
+      }
+
+      // check if event is deactivated
+      if (event.isDeactivated) {
+        res.status(400).send({
+          error: "Event has been deactivated",
         });
         return;
       }
@@ -924,6 +1045,18 @@ router.post(
       if (!event) {
         res.status(404).send({
           error: "Event not found",
+        });
+        return;
+      }
+
+      // check if event is deactivated
+      // deactivated is not equal to isActive
+      // isActive only checks if people can join the event
+      // isDeactivated checks if the event is removed
+      // they're not the same
+      if (event.isDeactivated) {
+        res.status(400).send({
+          error: "Event has been deactivated",
         });
         return;
       }
