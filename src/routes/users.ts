@@ -15,7 +15,7 @@ import {
   signOut,
   uploadProfilePicture,
 } from "../services/firebase.ts";
-import { encryptPassword } from "../services/bcrypt.ts";
+import { encryptPassword } from "../services/crypto.ts";
 import { ROLES } from "../helper/constants.ts";
 import { toArray } from "../services/mongoose.ts";
 import { findEventWithId } from "../services/events.ts";

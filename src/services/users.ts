@@ -1,7 +1,7 @@
 import { jwtDecode } from "jwt-decode";
 import User from "../schema/User.ts";
 import { ObjectId } from "mongodb";
-import { encryptPassword } from "./bcrypt.ts";
+import { encryptPassword } from "./crypto.ts";
 import { signIn, signOut, uploadProfilePicture } from "./firebase.ts";
 
 /**
@@ -156,7 +156,7 @@ export async function findAndPopulateUser(
 
 /**
  * Updates a user's profile picture and returns the url.
- * 
+ *
  * @param profilePicture the profile picture, either url or base64 encoded image
  * @param userId user id
  * @returns profile picture url

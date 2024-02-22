@@ -17,6 +17,8 @@ import {
 import { EVENT_SORT_TYPES } from "../helper/constants.ts";
 import { toArray } from "../services/mongoose.ts";
 import Participation from "../schema/Participation.ts";
+import QRCode from "qrcode";
+import { encryptSymmetric } from "../services/crypto.ts";
 
 const router = Router();
 
@@ -683,5 +685,83 @@ router.post("/:id/leave", checkUserRole, checkAccessToken, async (req, res) => {
     res.status(400).send(e);
   }
 });
+
+/**
+ * @route post /api/events/:id/qrcode
+ * :id = event's _id
+ * creates a qr code for an event
+ *
+ * requirements:
+ * - authorization
+ * - auth0 role: Admin
+ *
+ * results:
+ * {
+      message,
+      qrCodeString,
+    }
+ */
+router.post(
+  "/:id/qrcode",
+  checkAccessToken,
+  checkAdminRole,
+  async (req, res) => {
+    // get id from url params
+    const id = req.params.id;
+
+    try {
+      // find event with this id
+      const event = await findEventWithId(id);
+
+      if (!event) {
+        res.status(404).send({
+          error: "Event not found",
+        });
+        return;
+      }
+
+      if (event.qrCodeString) {
+        res.status(200).send({
+          message: "Event QR Code found successfully",
+          qrCodeString: event.qrCodeString,
+        });
+        return;
+      }
+
+      // create original string to be encoded
+      // date.now is in milliseconds
+      const originalString = `${event._id.toString()}|${Date.now().toFixed()}`;
+
+      const qrcodeEncryptionKey = process.env.QRCODE_ENCRYPTION_KEY;
+
+      if (!qrcodeEncryptionKey) {
+        res.status(500).send({
+          error: "QR Code Encryption Key not found",
+        });
+        return;
+      }
+
+      const cipher = encryptSymmetric(originalString, qrcodeEncryptionKey);
+
+      // create qr code
+      const qrCodeString = await QRCode.toDataURL(cipher.ciphertext);
+
+      // save qr code to event
+      await event.updateOne({
+        qrCodeString,
+        qrCodeIv: cipher.iv,
+      });
+
+      res.status(200).send({
+        message: "Event QR Code not yet generated. Successfully generated one.",
+        qrCodeString: qrCodeString,
+      });
+    } catch (e: any) {
+      // handle errors
+      console.error(e);
+      res.status(400).send(e);
+    }
+  }
+);
 
 export { router as eventRouter };

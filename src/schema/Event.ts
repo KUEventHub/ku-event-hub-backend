@@ -58,6 +58,11 @@ const schema = new Schema({
     type: String,
     default: null,
   },
+  // qr code iv
+  qrCodeIv: {
+    type: String,
+    default: null,
+  },
 
   // references
   createdBy: {
