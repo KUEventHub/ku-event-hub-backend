@@ -27,6 +27,7 @@
 - `post` `/api/events/:id/edit` edit event information
 - `post` `/api/events/:id/join` join event
 - `post` `/api/events/:id/leave` leave event
+- `post` `/api/events/:id/qrcode` get/create qr code
 
 #### friend requests `/api/friend-requests`
 
