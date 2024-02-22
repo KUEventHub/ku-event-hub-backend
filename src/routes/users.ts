@@ -1,5 +1,9 @@
 import { Router } from "express";
-import { checkAccessToken, checkSameUser } from "../middleware/auth.ts";
+import {
+  checkAccessToken,
+  checkSameUser,
+  checkUserRole,
+} from "../middleware/auth.ts";
 import {
   createUser,
   findUserWithId,
@@ -798,5 +802,97 @@ router.post("/:id/edit", checkAccessToken, checkSameUser, async (req, res) => {
     res.status(400).send(e);
   }
 });
+
+/**
+ * @route post /api/users/:id/unfriend
+ * :id = user's _id
+ * finds a user in the database and remove the friend
+ *
+ * requirements:
+ * - authorization: Bearer <access_token>
+ * - auth0 role: user
+ *
+ * results:
+ * {
+        message: "User unfriended successfully",
+      }
+ */
+router.post(
+  "/:id/unfriend",
+  checkAccessToken,
+  checkUserRole,
+  async (req, res) => {
+    // get id from url params
+    const id = req.params.id;
+    try {
+      // get user id from token
+      const token = req.get("Authorization");
+      const auth0id = getAuth0Id(token!);
+      const currentUser = await findUserWithAuth0Id(auth0id);
+      if (!currentUser) {
+        res.status(404).send({
+          error: "Current user not found",
+        });
+        return;
+      }
+
+      // find a user with id
+      const targetUser = await findUserWithId(id);
+
+      if (!targetUser) {
+        res.status(404).send({
+          error: "Target user not found",
+        });
+        return;
+      }
+
+      // check if you have them as a friend
+      const friends = toArray(currentUser.friends);
+
+      if (
+        !friends.some(
+          (friendId) => friendId.toString() === targetUser._id.toString()
+        )
+      ) {
+        res.status(400).send({
+          error: "You are not friends with this user",
+        });
+        return;
+      }
+
+      // check if they are your friend
+      const targetFriends = toArray(targetUser.friends);
+
+      if (
+        !targetFriends.some(
+          (friendId) => friendId.toString() === currentUser._id.toString()
+        )
+      ) {
+        res.status(400).send({
+          error: "Target user is not your friend",
+        });
+        return;
+      }
+
+      // remove them from your friends
+      await currentUser.updateOne({
+        $pull: { friends: targetUser._id },
+      });
+
+      // remove you from their friends
+      await targetUser.updateOne({
+        $pull: { friends: currentUser._id },
+      });
+
+      res.status(200).send({
+        message: "User unfriended successfully",
+      });
+    } catch (e: any) {
+      // handle errors
+      console.error(e);
+      res.status(400).send(e);
+    }
+  }
+);
 
 export { router as userRouter };

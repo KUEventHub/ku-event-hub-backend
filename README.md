@@ -17,6 +17,7 @@
 - `get` `/api/users/:id/edit` get user information for editing
 - `post` `/api/users/:id/edit` edit user information
 - `post` `/api/users/:id/edit-privacy` edit user privacy
+- `post` `/api/users/:id/unfriend` unfriend user
 
 #### events `/api/events`
 
