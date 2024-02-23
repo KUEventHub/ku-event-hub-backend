@@ -943,6 +943,68 @@ router.post(
 );
 
 /**
+ * @route get /api/events/:id/qrcode
+ * :id = event's _id
+ * get a qr code for an event
+ *
+ * requirements:
+ * - authorization
+ * - auth0 role: Admin
+ *
+ * results:
+ * {
+      message,
+      qrCodeString,
+    }
+ */
+router.get(
+  "/:id/qrcode",
+  checkAccessToken,
+  checkAdminRole,
+  async (req, res) => {
+    // get id from url params
+    const id = req.params.id;
+
+    try {
+      // find event with this id
+      const event = await findEventWithId(id);
+
+      if (!event) {
+        res.status(404).send({
+          error: "Event not found",
+        });
+        return;
+      }
+
+      // check if event is deactivated
+      if (event.isDeactivated) {
+        res.status(400).send({
+          error: "Event has been deactivated",
+        });
+        return;
+      }
+
+      // check if event is deactivated
+      if (!event.qrCodeString) {
+        res.status(400).send({
+          error: "Event QR Code not found",
+        });
+        return;
+      }
+
+      res.status(200).send({
+        message: "Event QR Code not yet generated. Successfully generated one.",
+        qrCodeString: event.qrCodeString,
+      });
+    } catch (e: any) {
+      // handle errors
+      console.error(e);
+      res.status(400).send(e);
+    }
+  }
+);
+
+/**
  * @route post /api/events/:id/qrcode
  * :id = event's _id
  * creates a qr code for an event

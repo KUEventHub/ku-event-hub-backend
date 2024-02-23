@@ -31,7 +31,8 @@
 - `post` `/api/events/:id/edit` edit event information
 - `post` `/api/events/:id/join` join event
 - `post` `/api/events/:id/leave` leave event
-- `post` `/api/events/:id/qrcode` get/create qr code
+- `get` `/api/events/:id/qrcode` get qr code
+- `post` `/api/events/:id/qrcode` create qr code
 - `post` `/api/events/:id/verify` verify participation
 - `post` `/api/events/:id/deactivate` deactivate event
 
