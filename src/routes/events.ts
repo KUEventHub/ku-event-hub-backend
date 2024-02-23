@@ -1099,7 +1099,7 @@ router.post(
  * - authorization
  * - auth0 role: user
  * - body: {
-      qrCodeString: string;
+      encryptedString: string;
     }
  * results:
  * {
