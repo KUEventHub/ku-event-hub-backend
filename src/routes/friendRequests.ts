@@ -631,8 +631,8 @@ router.post(
         return;
       }
 
-      // check if the friend request is for the current user
-      if (friendRequest.to.toString() !== currentUser._id.toString()) {
+      // check if the friend request is sent by the current user
+      if (friendRequest.from.toString() !== currentUser._id.toString()) {
         res.status(400).send({
           error: "This friend request is not for you",
         });
@@ -658,7 +658,7 @@ router.post(
       // check if you are already friends with the user
       const friendIds = toArray(currentUser.friends);
       const isAlreadyFriend = friendIds.some(
-        (friendId) => friendId.toString() === friendRequest.from.toString()
+        (friendId) => friendId.toString() === friendRequest.to.toString()
       );
 
       if (isAlreadyFriend) {
@@ -669,7 +669,7 @@ router.post(
       }
 
       // find the target user
-      const targetUser = await User.findById(friendRequest.from);
+      const targetUser = await User.findById(friendRequest.to);
       if (!targetUser) {
         res.status(404).send({
           error: "Target user not found",
