@@ -959,7 +959,7 @@ router.post("/:id/ban", checkAccessToken, checkAdminRole, async (req, res) => {
 
     if (!targetUser) {
       res.status(404).send({
-        message: "User not found",
+        message: "Target user not found",
       });
       return;
     }
@@ -1005,5 +1005,83 @@ router.post("/:id/ban", checkAccessToken, checkAdminRole, async (req, res) => {
     res.status(400).send(e);
   }
 });
+
+/**
+ * @route post /api/users/:id/unban
+ * unbans a user
+ *
+ * requirements:
+ * - id = target user's _id
+ * - authorization: Bearer <access_token>
+ * - user must be an admin
+ *
+ * results:
+ * {
+      message,
+    }
+ */
+router.post(
+  "/:id/unban",
+  checkAccessToken,
+  checkAdminRole,
+  async (req, res) => {
+    const id = req.params.id;
+    try {
+      // get user that sent the request
+      const token = req.get("Authorization");
+      const auth0id = getAuth0Id(token!);
+      const auth0User = await findUserWithAuth0Id(auth0id);
+
+      if (!auth0User) {
+        res.status(404).send({
+          error: "user not found",
+        });
+        return;
+      }
+
+      // find user
+      const targetUser = await User.findById(id);
+
+      if (!targetUser) {
+        res.status(404).send({
+          message: "Target user not found",
+        });
+        return;
+      }
+
+      // populate their ban
+      const currentBan = await BanLog.findById(targetUser.ban);
+
+      // if there is no ban
+      if (!currentBan) {
+        res.status(400).send({
+          message: "Target user is not banned",
+        });
+        return;
+      }
+
+      // check if user's ban is still active
+      if (currentBan.isActive) {
+        await currentBan.updateOne({
+          isActive: false,
+          updatedAt: Date.now(),
+        });
+        res.status(200).send({
+          message: "User unbanned successfully",
+        });
+        return;
+      }
+
+      // if ban is already inactive
+      res.status(400).send({
+        message: "Target user is not banned",
+      });
+    } catch (e: any) {
+      // handle errors
+      console.error(e);
+      res.status(400).send(e);
+    }
+  }
+);
 
 export { router as userRouter };
