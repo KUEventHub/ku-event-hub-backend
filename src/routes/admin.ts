@@ -53,7 +53,7 @@ router.get("/user-list", checkAccessToken, checkAdminRole, async (req, res) => {
           },
       {
         $facet: {
-          // pagination settings (where the events are actually returned)
+          // pagination settings (where the users are actually returned)
           data: [
             {
               $lookup: {
@@ -126,5 +126,132 @@ router.get("/user-list", checkAccessToken, checkAdminRole, async (req, res) => {
     res.status(400).send(e);
   }
 });
+
+/**
+ * @route get /api/admin/banned-list
+ * gets a list of banned users
+ *
+ * requirements:
+ * - user must be logged in
+ * - user must be an admin
+ * - params: {
+      pageSize: number;
+      pageNumber: number;
+    }
+ *
+ * results:
+ * {
+      pageNumber,
+      pageSize,
+      noPages,
+      users,
+      totalUsers,
+    }
+ */
+router.get(
+  "/banned-list",
+  checkAccessToken,
+  checkAdminRole,
+  async (req, res) => {
+    const pageNumber: number = req.query.pageNumber
+      ? parseInt(req.query.pageNumber.toString())
+      : 1;
+    const pageSize: number = req.query.pageSize
+      ? parseInt(req.query.pageSize.toString())
+      : 20;
+    try {
+      // get a list of users
+      const aggregatedUsers = await User.aggregate([
+        {
+          $lookup: {
+            from: TABLES.BAN_LOG,
+            let: { bannedUser: "$_id" },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ["$bannedUser", "$$bannedUser"] },
+                      { $eq: ["$isActive", true] },
+                    ],
+                  },
+                },
+              },
+            ],
+            as: "ban",
+          },
+        },
+        {
+          $match: {
+            ban: { $ne: [] }, // filter out users with an empty ban array
+          },
+        },
+        {
+          $project: {
+            _id: 1, // 1 means include this field
+            username: 1,
+            firstName: 1,
+            lastName: 1,
+            "ban._id": 1,
+            "ban.time": 1,
+            "ban.reason": 1,
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            count: { $sum: 1 },
+            data: { $push: "$$ROOT" },
+          },
+        },
+        {
+          $facet: {
+            paginatedData: [
+              { $unwind: "$data" },
+              { $replaceRoot: { newRoot: "$data" } },
+              {
+                $sort: {
+                  "ban.time": -1, // sort by time in descending order
+                },
+              },
+              {
+                $skip: (pageNumber - 1) * pageSize,
+              },
+              {
+                $limit: pageSize,
+              },
+            ],
+            totalCount: [
+              {
+                $project: {
+                  _id: 0,
+                  count: 1,
+                },
+              },
+            ],
+          },
+        },
+      ]);
+
+      const users = aggregatedUsers[0].paginatedData;
+
+      const totalUsers = aggregatedUsers[0].totalCount[0].count;
+
+      const noPages = Math.ceil(totalUsers / pageSize);
+
+      res.status(200).send({
+        pageNumber,
+        pageSize,
+        noPages,
+        users,
+        totalUsers,
+      });
+    } catch (e: any) {
+      // handle errors
+      console.error(e);
+      res.status(400).send(e);
+    }
+  }
+);
 
 export { router as adminRouter };

@@ -48,3 +48,4 @@
 #### admin `/api/admin`
 
 - `get` `/api/admin/user-list` get user list
+- `get` `/api/admin/banned-list` get banned user list
