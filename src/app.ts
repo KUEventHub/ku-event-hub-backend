@@ -22,6 +22,7 @@ import "./services/firebase.ts";
 
 // services
 import { checkActiveEvents } from "./services/events.ts";
+import { checkActiveBans } from "./services/bans.ts";
 
 const app = express();
 const port = process.env.PORT;
@@ -47,7 +48,8 @@ app.listen(port, () => {
   console.log(`[server]: Server is running at http://localhost:${port}`);
 });
 
-// check active events every hour
+// check active events and ban every hour
 setInterval(async () => {
   await checkActiveEvents();
+  await checkActiveBans();
 }, 1000 * 60 * 60);

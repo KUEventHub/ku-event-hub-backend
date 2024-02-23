@@ -3,6 +3,7 @@ import {
   checkAdminRole,
   checkAccessToken,
   checkUserRole,
+  checkUserBan,
 } from "../middleware/auth.ts";
 import { getEventTypesFromStrings } from "../services/eventtypes.ts";
 import { findUserWithAuth0Id, getAuth0Id } from "../services/users.ts";
@@ -231,102 +232,107 @@ router.post("/create", checkAccessToken, checkAdminRole, async (req, res) => {
  *
  *
  */
-router.post("/check-qrcode", checkAccessToken, async (req, res) => {
-  // get id from url params
-  const body: {
-    eventId: string;
-    qrCodeString: string;
-  } = req.body;
+router.post(
+  "/check-qrcode",
+  checkAccessToken,
+  checkUserBan,
+  async (req, res) => {
+    // get id from url params
+    const body: {
+      eventId: string;
+      qrCodeString: string;
+    } = req.body;
 
-  try {
-    // get user id from token
-    const token = req.get("Authorization");
-    const auth0id = getAuth0Id(token!);
-    const user = await findUserWithAuth0Id(auth0id);
+    try {
+      // get user id from token
+      const token = req.get("Authorization");
+      const auth0id = getAuth0Id(token!);
+      const user = await findUserWithAuth0Id(auth0id);
 
-    if (!user) {
-      res.status(404).send({
-        error: "User not found",
-      });
-      return;
-    }
+      if (!user) {
+        res.status(404).send({
+          error: "User not found",
+        });
+        return;
+      }
 
-    // find event with this id
-    const event = await findEventWithId(body.eventId);
+      // find event with this id
+      const event = await findEventWithId(body.eventId);
 
-    if (!event) {
-      res.status(404).send({
-        error: "Event not found",
-      });
-      return;
-    }
+      if (!event) {
+        res.status(404).send({
+          error: "Event not found",
+        });
+        return;
+      }
 
-    // check if there's a qr code
-    if (!event.qrCodeString) {
-      res.status(400).send({
-        error: "Event QR Code not found",
-      });
-      return;
-    }
+      // check if there's a qr code
+      if (!event.qrCodeString) {
+        res.status(400).send({
+          error: "Event QR Code not found",
+        });
+        return;
+      }
 
-    // check if event is deactivated
-    if (event.isDeactivated) {
-      res.status(400).send({
-        error: "Event has been deactivated",
-      });
-      return;
-    }
+      // check if event is deactivated
+      if (event.isDeactivated) {
+        res.status(400).send({
+          error: "Event has been deactivated",
+        });
+        return;
+      }
 
-    // convert data uri qr code to image
-    // then decode the image
-    const qrcodeString = await checkQrcode(body.qrCodeString);
+      // convert data uri qr code to image
+      // then decode the image
+      const qrcodeString = await checkQrcode(body.qrCodeString);
 
-    if (!qrcodeString) {
+      if (!qrcodeString) {
+        res.status(200).send({
+          message: "QR Code checked successfully",
+          results: {
+            isValid: false,
+          },
+        });
+        return;
+      }
+
+      // decrypt text string gotten from the decoded image
+      const qrcodeEncryptionKey = process.env.QRCODE_ENCRYPTION_KEY;
+
+      if (!qrcodeEncryptionKey) {
+        res.status(500).send({
+          error: "QR Code Encryption Key not found",
+        });
+        return;
+      }
+
+      const decryptedText = decryptSymmetric(
+        qrcodeEncryptionKey,
+        qrcodeString,
+        event.qrCodeIv
+      );
+
+      const decryptedTextArray = decryptedText.split("|");
+      const decryptedEventId = decryptedTextArray[0];
+      const decryptedTimestamp = new Date(parseInt(decryptedTextArray[1]));
+
+      const isValid = decryptedEventId === event._id.toString();
+
       res.status(200).send({
         message: "QR Code checked successfully",
         results: {
-          isValid: false,
+          isValid: isValid,
+          eventId: decryptedEventId,
+          createdAt: decryptedTimestamp,
         },
       });
-      return;
+    } catch (e: any) {
+      // handle errors
+      console.error(e);
+      res.status(400).send(e);
     }
-
-    // decrypt text string gotten from the decoded image
-    const qrcodeEncryptionKey = process.env.QRCODE_ENCRYPTION_KEY;
-
-    if (!qrcodeEncryptionKey) {
-      res.status(500).send({
-        error: "QR Code Encryption Key not found",
-      });
-      return;
-    }
-
-    const decryptedText = decryptSymmetric(
-      qrcodeEncryptionKey,
-      qrcodeString,
-      event.qrCodeIv
-    );
-
-    const decryptedTextArray = decryptedText.split("|");
-    const decryptedEventId = decryptedTextArray[0];
-    const decryptedTimestamp = new Date(parseInt(decryptedTextArray[1]));
-
-    const isValid = decryptedEventId === event._id.toString();
-
-    res.status(200).send({
-      message: "QR Code checked successfully",
-      results: {
-        isValid: isValid,
-        eventId: decryptedEventId,
-        createdAt: decryptedTimestamp,
-      },
-    });
-  } catch (e: any) {
-    // handle errors
-    console.error(e);
-    res.status(400).send(e);
   }
-});
+);
 
 /**
  * @route get /api/events/:id
@@ -672,106 +678,114 @@ router.post("/:id/edit", checkAccessToken, checkAdminRole, async (req, res) => {
     }
  * 
  */
-router.post("/:id/join", checkUserRole, checkAccessToken, async (req, res) => {
-  // get id from url params
-  const id = req.params.id;
+router.post(
+  "/:id/join",
+  checkUserRole,
+  checkAccessToken,
+  checkUserBan,
+  async (req, res) => {
+    // get id from url params
+    const id = req.params.id;
 
-  try {
-    // get user id from token
-    const token = req.get("Authorization");
-    const auth0id = getAuth0Id(token!);
-    const user = await findUserWithAuth0Id(auth0id);
-    if (!user) {
-      res.status(404).send({
-        error: "User not found",
-      });
-      return;
-    }
+    try {
+      // get user id from token
+      const token = req.get("Authorization");
+      const auth0id = getAuth0Id(token!);
+      const user = await findUserWithAuth0Id(auth0id);
+      if (!user) {
+        res.status(404).send({
+          error: "User not found",
+        });
+        return;
+      }
 
-    // find event with this id
-    const event = await findEventWithId(id);
-    if (!event) {
-      res.status(404).send({
-        error: "Event not found",
-      });
-      return;
-    }
+      // find event with this id
+      const event = await findEventWithId(id);
+      if (!event) {
+        res.status(404).send({
+          error: "Event not found",
+        });
+        return;
+      }
 
-    // check if event is active
-    if (!event.isActive) {
-      res.status(400).send({
-        error: "Event is not active",
-      });
-      return;
-    }
+      // check if event is active
+      if (!event.isActive) {
+        res.status(400).send({
+          error: "Event is not active",
+        });
+        return;
+      }
 
-    // check if event has been deactivated
-    if (event.isDeactivated) {
-      res.status(400).send({
-        error: "Event has been deactivated",
-      });
-      return;
-    }
+      // check if event has been deactivated
+      if (event.isDeactivated) {
+        res.status(400).send({
+          error: "Event has been deactivated",
+        });
+        return;
+      }
 
-    // check if user already joined
-    await user.populate("joinedEvents");
-    const userParticipations = toArray(user.joinedEvents);
-    const joinedParticipations = userParticipations.filter((participation) => {
-      return (
-        // find participation with this event id
-        participation.event.toString() === event._id.toString() &&
-        // check if participation is active
-        participation.isActive
+      // check if user already joined
+      await user.populate("joinedEvents");
+      const userParticipations = toArray(user.joinedEvents);
+      const joinedParticipations = userParticipations.filter(
+        (participation) => {
+          return (
+            // find participation with this event id
+            participation.event.toString() === event._id.toString() &&
+            // check if participation is active
+            participation.isActive
+          );
+        }
       );
-    });
 
-    if (joinedParticipations.length > 0) {
-      res.status(400).send({
-        error: "User already joined this event",
+      if (joinedParticipations.length > 0) {
+        res.status(400).send({
+          error: "User already joined this event",
+        });
+        return;
+      }
+
+      // check if event is full
+      if (joinedParticipations.length >= event.totalSeats) {
+        res.status(400).send({
+          error: "Event is full",
+        });
+        return;
+      }
+
+      // add participation
+      const participation = new Participation({
+        user: user._id,
+        event: event._id,
       });
-      return;
-    }
 
-    // check if event is full
-    if (joinedParticipations.length >= event.totalSeats) {
-      res.status(400).send({
-        error: "Event is full",
+      await participation.save();
+
+      // link participation to the event and the user
+      const eventParticipants = toArray(event.participants);
+      eventParticipants.push(participation._id);
+      await event.updateOne({
+        participants: eventParticipants,
       });
-      return;
+
+      user.depopulate("joinedEvents");
+      const userJoinedEvents = toArray(user.joinedEvents);
+      userJoinedEvents.push(participation._id);
+      await user.updateOne({
+        joinedEvents: userJoinedEvents,
+      });
+
+      res.status(200).send({
+        message: "Event joined successfully",
+        participation: participation._id,
+      });
+    } catch (e: any) {
+      // handle errors
+      console.error(e);
+      res.status(400).send(e);
     }
-
-    // add participation
-    const participation = new Participation({
-      user: user._id,
-      event: event._id,
-    });
-
-    await participation.save();
-
-    // link participation to the event and the user
-    const eventParticipants = toArray(event.participants);
-    eventParticipants.push(participation._id);
-    await event.updateOne({
-      participants: eventParticipants,
-    });
-
-    user.depopulate("joinedEvents");
-    const userJoinedEvents = toArray(user.joinedEvents);
-    userJoinedEvents.push(participation._id);
-    await user.updateOne({
-      joinedEvents: userJoinedEvents,
-    });
-
-    res.status(200).send({
-      message: "Event joined successfully",
-      participation: participation._id,
-    });
-  } catch (e: any) {
-    // handle errors
-    console.error(e);
-    res.status(400).send(e);
   }
-});
+);
 
 /**
  * @route post /api/events/:id/leave
@@ -790,77 +804,85 @@ router.post("/:id/join", checkUserRole, checkAccessToken, async (req, res) => {
     }
  * 
  */
-router.post("/:id/leave", checkUserRole, checkAccessToken, async (req, res) => {
-  // get id from url params
-  const id = req.params.id;
+router.post(
+  "/:id/leave",
+  checkUserRole,
+  checkAccessToken,
+  checkUserBan,
+  async (req, res) => {
+    // get id from url params
+    const id = req.params.id;
 
-  try {
-    // get user id from token
-    const token = req.get("Authorization");
-    const auth0id = getAuth0Id(token!);
-    const user = await findUserWithAuth0Id(auth0id);
-    if (!user) {
-      res.status(404).send({
-        error: "User not found",
-      });
-      return;
-    }
+    try {
+      // get user id from token
+      const token = req.get("Authorization");
+      const auth0id = getAuth0Id(token!);
+      const user = await findUserWithAuth0Id(auth0id);
+      if (!user) {
+        res.status(404).send({
+          error: "User not found",
+        });
+        return;
+      }
 
-    // find event with this id
-    const event = await findEventWithId(id);
-    if (!event) {
-      res.status(404).send({
-        error: "Event not found",
-      });
-      return;
-    }
+      // find event with this id
+      const event = await findEventWithId(id);
+      if (!event) {
+        res.status(404).send({
+          error: "Event not found",
+        });
+        return;
+      }
 
-    // check if event is deactivated
-    if (event.isDeactivated) {
-      res.status(400).send({
-        error: "Event has been deactivated",
-      });
-      return;
-    }
+      // check if event is deactivated
+      if (event.isDeactivated) {
+        res.status(400).send({
+          error: "Event has been deactivated",
+        });
+        return;
+      }
 
-    // check if user already joined the event
-    await user.populate("joinedEvents");
-    const userParticipations = toArray(user.joinedEvents);
-    const joinedParticipations = userParticipations.filter((participation) => {
-      return (
-        // find participation with this event id
-        participation.event.toString() === event._id.toString() &&
-        // check if participation is active
-        participation.isActive
+      // check if user already joined the event
+      await user.populate("joinedEvents");
+      const userParticipations = toArray(user.joinedEvents);
+      const joinedParticipations = userParticipations.filter(
+        (participation) => {
+          return (
+            // find participation with this event id
+            participation.event.toString() === event._id.toString() &&
+            // check if participation is active
+            participation.isActive
+          );
+        }
       );
-    });
 
-    if (joinedParticipations.length <= 0) {
-      res.status(400).send({
-        error: "User hasn't joined this event",
+      if (joinedParticipations.length <= 0) {
+        res.status(400).send({
+          error: "User hasn't joined this event",
+        });
+        return;
+      }
+
+      // deactivate participation
+      // safety measure - if there's SOMEHOW multiple active participations
+      // deactivate all of them
+      for (const participation of joinedParticipations) {
+        await participation.updateOne({
+          isActive: false,
+          updatedAt: Date.now(),
+        });
+      }
+
+      res.status(200).send({
+        message: "Event left successfully",
       });
-      return;
+    } catch (e: any) {
+      // handle errors
+      console.error(e);
+      res.status(400).send(e);
     }
-
-    // deactivate participation
-    // safety measure - if there's SOMEHOW multiple active participations
-    // deactivate all of them
-    for (const participation of joinedParticipations) {
-      await participation.updateOne({
-        isActive: false,
-        updatedAt: Date.now(),
-      });
-    }
-
-    res.status(200).send({
-      message: "Event left successfully",
-    });
-  } catch (e: any) {
-    // handle errors
-    console.error(e);
-    res.status(400).send(e);
   }
-});
+);
 
 /**
  * @route post /api/events/:id/deactivate
@@ -1027,6 +1049,7 @@ router.post(
   "/:id/verify",
   checkAccessToken,
   checkUserRole,
+  checkUserBan,
   async (req, res) => {
     // get id from url params
     const id = req.params.id;
@@ -1099,9 +1122,14 @@ router.post(
       const bodyQrcodeString = await checkQrcode(body.qrCodeString);
       const eventQrcodeString = await checkQrcode(event.qrCodeString);
 
-      console.log(bodyQrcodeString, eventQrcodeString);
-
       if (!bodyQrcodeString) {
+        res.status(400).send({
+          error: "Invalid QR Code",
+        });
+        return;
+      }
+
+      if (bodyQrcodeString !== eventQrcodeString) {
         res.status(400).send({
           error: "Invalid QR Code",
         });

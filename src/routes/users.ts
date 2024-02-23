@@ -1,7 +1,9 @@
 import { Router } from "express";
 import {
   checkAccessToken,
+  checkAdminRole,
   checkSameUser,
+  checkUserBan,
   checkUserRole,
 } from "../middleware/auth.ts";
 import {
@@ -24,6 +26,8 @@ import { ROLES } from "../helper/constants.ts";
 import { toArray } from "../services/mongoose.ts";
 import { findEventWithId } from "../services/events.ts";
 import LoginLog from "../schema/LoginLog.ts";
+import BanLog from "../schema/BanLog.ts";
+import User from "../schema/User.ts";
 
 const router = Router();
 
@@ -178,7 +182,7 @@ router.post("/create", checkAccessToken, async (req, res) => {
       },
     }
  */
-router.get("/me", checkAccessToken, async (req, res) => {
+router.get("/me", checkAccessToken, checkUserBan, async (req, res) => {
   try {
     const token = req.get("Authorization");
     const auth0id = getAuth0Id(token!);
@@ -221,7 +225,7 @@ router.get("/me", checkAccessToken, async (req, res) => {
       message: "User login logged successfully",
     }
  */
-router.post("/login", checkAccessToken, async (req, res) => {
+router.post("/login", checkAccessToken, checkUserBan, async (req, res) => {
   try {
     const token = req.get("Authorization");
     const auth0id = getAuth0Id(token!);
@@ -564,6 +568,7 @@ router.post(
   "/:id/edit-privacy",
   checkAccessToken,
   checkSameUser,
+  checkUserBan,
   async (req, res) => {
     // get id from url params
     const id = req.params.id;
@@ -646,51 +651,57 @@ router.post(
       }
     }
  */
-router.get("/:id/edit", checkAccessToken, checkSameUser, async (req, res) => {
-  // get id from url params
-  const id = req.params.id;
+router.get(
+  "/:id/edit",
+  checkAccessToken,
+  checkSameUser,
+  checkUserBan,
+  async (req, res) => {
+    // get id from url params
+    const id = req.params.id;
 
-  try {
-    // find a user with id
-    const user = await findAndPopulateUser(id, {
-      interestedEventTypes: true,
-    });
-
-    const interestedEventTypes = toArray(user.interestedEventTypes);
-
-    if (!user) {
-      res.status(404).send({
-        error: "User not found",
+    try {
+      // find a user with id
+      const user = await findAndPopulateUser(id, {
+        interestedEventTypes: true,
       });
-      return;
+
+      const interestedEventTypes = toArray(user.interestedEventTypes);
+
+      if (!user) {
+        res.status(404).send({
+          error: "User not found",
+        });
+        return;
+      }
+
+      const userJson = {
+        profilePictureUrl: user.profilePictureUrl,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        idCode: user.idCode,
+        faculty: user.faculty,
+        phoneNumber: user.phoneNumber,
+        gender: user.gender,
+        description: user.description,
+        interestedEventTypes: interestedEventTypes.map(
+          (eventType) => eventType.name
+        ),
+      };
+
+      res.status(200).send({
+        message: "User found successfully",
+        user: userJson,
+      });
+    } catch (e: any) {
+      // handle errors
+      console.error(e);
+      res.status(400).send(e);
     }
-
-    const userJson = {
-      profilePictureUrl: user.profilePictureUrl,
-      username: user.username,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      idCode: user.idCode,
-      faculty: user.faculty,
-      phoneNumber: user.phoneNumber,
-      gender: user.gender,
-      description: user.description,
-      interestedEventTypes: interestedEventTypes.map(
-        (eventType) => eventType.name
-      ),
-    };
-
-    res.status(200).send({
-      message: "User found successfully",
-      user: userJson,
-    });
-  } catch (e: any) {
-    // handle errors
-    console.error(e);
-    res.status(400).send(e);
   }
-});
+);
 
 /**
  * @route post /api/users/:id/edit
@@ -724,84 +735,90 @@ router.get("/:id/edit", checkAccessToken, checkSameUser, async (req, res) => {
       message: "User updated successfully",
     }
  */
-router.post("/:id/edit", checkAccessToken, checkSameUser, async (req, res) => {
-  // get id from url params
-  const id = req.params.id;
+router.post(
+  "/:id/edit",
+  checkAccessToken,
+  checkSameUser,
+  checkUserBan,
+  async (req, res) => {
+    // get id from url params
+    const id = req.params.id;
 
-  const body: {
-    user: {
-      username?: string;
-      firstName?: string;
-      lastName?: string;
-      idCode?: string;
-      faculty?: string;
-      phoneNumber?: string;
-      profilePicture?: {
-        url?: string;
-        base64Image?: string;
+    const body: {
+      user: {
+        username?: string;
+        firstName?: string;
+        lastName?: string;
+        idCode?: string;
+        faculty?: string;
+        phoneNumber?: string;
+        profilePicture?: {
+          url?: string;
+          base64Image?: string;
+        };
+        gender?: string;
+        description?: string;
+        interestedEventTypes?: string[];
       };
-      gender?: string;
-      description?: string;
-      interestedEventTypes?: string[];
-    };
-  } = req.body;
+    } = req.body;
 
-  try {
-    // find a user with id
-    const user = await findUserWithId(id);
+    try {
+      // find a user with id
+      const user = await findUserWithId(id);
 
-    if (!user) {
-      res.status(404).send({
-        error: "User not found",
-      });
-      return;
-    }
+      if (!user) {
+        res.status(404).send({
+          error: "User not found",
+        });
+        return;
+      }
 
-    // get event types ids
-    const eventTypes = body.user.interestedEventTypes
-      ? await getEventTypesFromStrings(body.user.interestedEventTypes)
-      : [];
-
-    const eventTypeIds =
-      eventTypes.length > 0
-        ? eventTypes.map((eventType) => eventType!._id)
+      // get event types ids
+      const eventTypes = body.user.interestedEventTypes
+        ? await getEventTypesFromStrings(body.user.interestedEventTypes)
         : [];
 
-    const userJson: any = {
-      username: body.user.username,
-      firstName: body.user.firstName,
-      lastName: body.user.lastName,
-      idCode: body.user.idCode,
-      faculty: body.user.faculty,
-      phoneNumber: body.user.phoneNumber,
-      gender: body.user.gender,
-      description: body.user.description,
-      updatedAt: Date.now(),
-    };
+      const eventTypeIds =
+        eventTypes.length > 0
+          ? eventTypes.map((eventType) => eventType!._id)
+          : [];
 
-    if (body.user.interestedEventTypes) {
-      userJson.interestedEventTypes = eventTypeIds;
+      const userJson: any = {
+        username: body.user.username,
+        firstName: body.user.firstName,
+        lastName: body.user.lastName,
+        idCode: body.user.idCode,
+        faculty: body.user.faculty,
+        phoneNumber: body.user.phoneNumber,
+        gender: body.user.gender,
+        description: body.user.description,
+        updatedAt: Date.now(),
+      };
+
+      if (body.user.interestedEventTypes) {
+        userJson.interestedEventTypes = eventTypeIds;
+      }
+
+      let profilePictureUrl = body.user.profilePicture
+        ? await getProfilePictureUrl(body.user.profilePicture, id)
+        : undefined;
+
+      if (profilePictureUrl) {
+        userJson.profilePictureUrl = profilePictureUrl;
+      }
+
+      await user.updateOne(userJson);
+
+      res.status(200).send({
+        message: "User updated successfully",
+      });
+    } catch (e: any) {
+      // handle errors
+      console.error(e);
+      res.status(400).send(e);
     }
-
-    let profilePictureUrl = body.user.profilePicture
-      ? await getProfilePictureUrl(body.user.profilePicture, id)
-      : undefined;
-
-    if (profilePictureUrl) {
-      userJson.profilePictureUrl = profilePictureUrl;
-    }
-
-    await user.updateOne(userJson);
-
-    res.status(200).send({
-      message: "User updated successfully",
-    });
-  } catch (e: any) {
-    // handle errors
-    console.error(e);
-    res.status(400).send(e);
   }
-});
+);
 
 /**
  * @route post /api/users/:id/unfriend
@@ -821,6 +838,7 @@ router.post(
   "/:id/unfriend",
   checkAccessToken,
   checkUserRole,
+  checkUserBan,
   async (req, res) => {
     // get id from url params
     const id = req.params.id;
@@ -894,5 +912,98 @@ router.post(
     }
   }
 );
+
+/**
+ * @route post /api/users/:id/ban
+ * bans a user
+ *
+ * requirements:
+ * - id = target user's _id
+ * - authorization: Bearer <access_token>
+ * - user must be an admin
+ * - body {
+    reason: string;
+    banDuration?: number;
+  }
+ *
+ * results:
+ * {
+      message,
+      banId,
+    }
+ */
+router.post("/:id/ban", checkAccessToken, checkAdminRole, async (req, res) => {
+  const id = req.params.id;
+  const body: {
+    reason: string;
+    banDuration?: number; // in seconds.. yes, seconds.
+  } = req.body;
+
+  const banDuration: number = body.banDuration ? body.banDuration : 315360000; // default to ten years in the joint
+
+  try {
+    // get user that sent the request
+    const token = req.get("Authorization");
+    const auth0id = getAuth0Id(token!);
+    const auth0User = await findUserWithAuth0Id(auth0id);
+
+    if (!auth0User) {
+      res.status(404).send({
+        error: "user not found",
+      });
+      return;
+    }
+
+    // find user
+    const targetUser = await User.findById(id);
+
+    if (!targetUser) {
+      res.status(404).send({
+        message: "User not found",
+      });
+      return;
+    }
+
+    // populate their ban
+    const currentBan = await BanLog.findById(targetUser.ban);
+
+    // check if user is already banned
+    // isActive may not be accurate (but it'll update when it needs to work)
+    if (currentBan && currentBan.isActive) {
+      res.status(400).send({
+        message: "Target user is already banned",
+      });
+      return;
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + banDuration * 1000);
+
+    // create a new ban
+    const newBan = new BanLog({
+      reason: body.reason,
+      time: now,
+      expiresAt: expiresAt,
+      bannedUser: targetUser._id,
+      bannedBy: auth0User._id,
+    });
+
+    await newBan.save();
+
+    // update user's ban
+    await targetUser.updateOne({
+      ban: newBan._id,
+    });
+
+    res.status(200).send({
+      message: "User banned successfully",
+      banId: newBan._id,
+    });
+  } catch (e: any) {
+    // handle errors
+    console.error(e);
+    res.status(400).send(e);
+  }
+});
 
 export { router as userRouter };

@@ -127,39 +127,4 @@ router.get("/user-list", checkAccessToken, checkAdminRole, async (req, res) => {
   }
 });
 
-/**
- * @route post /api/admin/ban
- *
- *
- * requirements:
- *
- *
- *
- * results:
- *
- *
- *
- */
-router.post("/ban", checkAccessToken, checkAdminRole, async (req, res) => {
-  const body: {
-    userId: string;
-    reason: string;
-    banLength: number; // in seconds.. yes, seconds.
-  } = req.body;
-
-  try {
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + body.banLength * 1000);
-    res.status(200).send({
-      message: "hi it's not done yet but please take it for now",
-      now,
-      expiresAt,
-    });
-  } catch (e: any) {
-    // handle errors
-    console.error(e);
-    res.status(400).send(e);
-  }
-});
-
 export { router as adminRouter };

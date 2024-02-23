@@ -5,6 +5,7 @@ import "dotenv/config"; // config from .env
 import { jwtDecode } from "jwt-decode";
 import { ROLES } from "../helper/constants.ts";
 import { findUserWithAuth0Id, getAuth0Id } from "../services/users.ts";
+import BanLog from "../schema/BanLog.ts";
 
 declare module "jwt-decode" {
   export interface JwtPayload {
@@ -106,6 +107,62 @@ export const checkSameUser: RequestHandler = async (req, res, next) => {
       error: "Unauthorized",
     });
     return;
+  }
+
+  // continue
+  next();
+};
+
+/**
+ * Middleware: checks if the user is banned.
+ * On the off chance that user managed to evade the ban check frontend.
+ */
+export const checkUserBan: RequestHandler = async (req, res, next) => {
+  // check user token
+  const token = req.get("Authorization");
+  const auth0id = getAuth0Id(token!);
+  const auth0user = await findUserWithAuth0Id(auth0id);
+
+  // if there's no user with auth0 id, respond with error
+  if (!auth0user) {
+    res.status(404).send({
+      error: "User not found",
+    });
+    return;
+  }
+
+  // get user ban
+  const ban = await BanLog.findById(auth0user.ban);
+
+  // if there is no ban
+  if (!ban) {
+    // continue
+    next();
+    return;
+  }
+
+  // if ban is active
+  if (ban.isActive) {
+    // check if ban is expired
+    const now = new Date();
+
+    if (ban.expiresAt < now) {
+      await ban.updateOne({
+        isActive: false,
+        updatedAt: Date.now(),
+      });
+    } else {
+      // if not expired, respond with error
+      res.status(403).send({
+        error: "You are banned",
+        ban: {
+          _id: ban._id,
+          reason: ban.reason,
+          expiresAt: ban.expiresAt,
+        },
+      });
+      return;
+    }
   }
 
   // continue
