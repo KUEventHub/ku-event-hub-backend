@@ -243,8 +243,6 @@ router.get("/recommended", checkAccessToken, async (req, res) => {
       ];
     }
 
-    console.log(events[0].data);
-
     const formattedEvents = events[0].data.map((event: any) => {
       return {
         _id: event._id,
