@@ -218,7 +218,7 @@ router.post("/create", checkAccessToken, checkAdminRole, async (req, res) => {
  * - authorization
  * - body: {
     eventId: string;
-    qrCodeString: string;
+    encryptedString: string;
   }
  * results:
  * {
@@ -240,7 +240,7 @@ router.post(
     // get id from url params
     const body: {
       eventId: string;
-      qrCodeString: string;
+      encryptedString: string;
     } = req.body;
 
     try {
@@ -282,9 +282,8 @@ router.post(
         return;
       }
 
-      // convert data uri qr code to image
-      // then decode the image
-      const qrcodeString = await checkQrcode(body.qrCodeString);
+      // check if qr code string is empty
+      const qrcodeString = body.encryptedString;
 
       if (!qrcodeString) {
         res.status(200).send({
@@ -1116,7 +1115,7 @@ router.post(
     // get id from url params
     const id = req.params.id;
     const body: {
-      qrCodeString: string;
+      encryptedString: string;
     } = req.body;
 
     try {
@@ -1181,17 +1180,39 @@ router.post(
       }
 
       // check the qr code given
-      const bodyQrcodeString = await checkQrcode(body.qrCodeString);
+      const bodyQrcodeString = body.encryptedString;
       const eventQrcodeString = await checkQrcode(event.qrCodeString);
 
-      if (!bodyQrcodeString) {
+      if (!bodyQrcodeString || !eventQrcodeString) {
         res.status(400).send({
           error: "Invalid QR Code",
         });
         return;
       }
 
-      if (bodyQrcodeString !== eventQrcodeString) {
+      // decrypt text string gotten from the decoded image
+      const qrcodeEncryptionKey = process.env.QRCODE_ENCRYPTION_KEY;
+
+      if (!qrcodeEncryptionKey) {
+        res.status(500).send({
+          error: "QR Code Encryption Key not found",
+        });
+        return;
+      }
+
+      const bodyText = decryptSymmetric(
+        qrcodeEncryptionKey,
+        bodyQrcodeString,
+        event.qrCodeIv
+      );
+
+      const eventText = decryptSymmetric(
+        qrcodeEncryptionKey,
+        eventQrcodeString,
+        event.qrCodeIv
+      );
+
+      if (bodyText !== eventText) {
         res.status(400).send({
           error: "Invalid QR Code",
         });
