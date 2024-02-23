@@ -15,12 +15,13 @@ import {
   getImageUrl,
   updateEvent,
 } from "../services/events.ts";
-import { EVENT_SORT_TYPES } from "../helper/constants.ts";
+import { EVENT_SORT_TYPES, TABLES } from "../helper/constants.ts";
 import { toArray } from "../services/mongoose.ts";
 import Participation from "../schema/Participation.ts";
 import QRCode from "qrcode";
 import { decryptSymmetric, encryptSymmetric } from "../helper/crypto.ts";
 import { checkQrcode } from "../helper/qrcode.ts";
+import Event from "../schema/Event.ts";
 
 const router = Router();
 
@@ -86,6 +87,191 @@ router.get("/", async (req, res) => {
       noPages,
       events: events.events,
       totalCount: events.count,
+    });
+  } catch (e: any) {
+    // handle error
+    console.error(e);
+    res.status(400).send(e);
+  }
+});
+
+/**
+ * @route get /api/events/recommended
+ * get recommended events for the user
+ *
+ * requirements:
+ * - params: {
+ *    pageNumber: number;
+ *    pageSize: number;
+ *  }
+ *
+ * results:
+ * {
+      pageNumber,
+      pageSize,
+      noPages,
+      events,
+      totalCount,
+    }
+ */
+router.get("/recommended", checkAccessToken, async (req, res) => {
+  const pageNumber: number = req.query.pageNumber
+    ? parseInt(req.query.pageNumber.toString())
+    : 1;
+  const pageSize: number = req.query.pageSize
+    ? parseInt(req.query.pageSize.toString())
+    : 20;
+
+  try {
+    // get user id from token
+    const token = req.get("Authorization");
+    const auth0id = getAuth0Id(token!);
+    const user = await findUserWithAuth0Id(auth0id);
+
+    if (!user) {
+      res.status(404).send({
+        error: "User not found",
+      });
+      return;
+    }
+
+    const eventTypes = toArray(user.interestedEventTypes);
+
+    let events;
+
+    try {
+      events = await Event.aggregate([
+        {
+          $match: {
+            // never count deactivated events
+            isDeactivated: {
+              $eq: false,
+            },
+          },
+        },
+        // get only events that the user is interested in
+        {
+          $addFields: {
+            isInterested: {
+              $cond: [
+                { $setIsSubset: ["$eventTypes", eventTypes] }, // check if eventTypes of an event is a subset of the user's interested event types
+                1,
+                0,
+              ],
+            },
+          },
+        },
+        // populate the participant field
+        {
+          $lookup: {
+            from: TABLES.PARTICIPATION,
+            localField: "participants",
+            foreignField: "_id",
+            as: "participants",
+          },
+        },
+        // get the active participants amount
+        {
+          $addFields: {
+            activeParticipants: {
+              $size: {
+                $filter: {
+                  input: "$participants",
+                  as: "participant",
+                  cond: {
+                    $eq: ["$$participant.isActive", true],
+                  },
+                },
+              },
+            },
+          },
+        },
+        // sorting
+        {
+          $sort: {
+            isInterested: -1, // events that match the user's interested event types will be on top
+            createdAt: -1, // most recent
+            isActive: -1,
+          },
+        },
+
+        {
+          $facet: {
+            // pagination settings (where the events are actually returned)
+            data: [
+              {
+                $skip: (pageNumber - 1) * pageSize,
+              },
+              {
+                $limit: pageSize,
+              },
+              {
+                // exclusion
+                $project: {
+                  isInterested: 0, // remove the isInterested field
+                },
+              },
+              // populate event types
+              {
+                $lookup: {
+                  from: TABLES.EVENT_TYPE,
+                  localField: "eventTypes",
+                  foreignField: "_id",
+                  as: "eventTypes",
+                },
+              },
+            ],
+            // extra information
+            info: [
+              {
+                $count: "count", // count how many items were found after filtering
+              },
+            ],
+          },
+        },
+      ]);
+    } catch (error: any) {
+      events = [
+        {
+          data: [],
+          info: [
+            {
+              count: 0,
+            },
+          ],
+        },
+      ];
+    }
+
+    console.log(events[0].data);
+
+    const formattedEvents = events[0].data.map((event: any) => {
+      return {
+        _id: event._id,
+        name: event.name,
+        imageUrl: event.imageUrl,
+        activityHours: event.activityHours,
+        totalSeats: event.totalSeats,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        location: event.location,
+        description: event.description,
+        isActive: event.isActive,
+        participantsCount: event.activeParticipants, // active participants
+        eventTypes: event.eventTypes,
+      };
+    });
+
+    const count = events[0].info[0].count;
+
+    const noPages = Math.ceil(count / pageSize);
+
+    res.status(200).send({
+      pageNumber,
+      pageSize,
+      noPages,
+      events: formattedEvents,
+      totalCount: count,
     });
   } catch (e: any) {
     // handle error

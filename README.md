@@ -24,6 +24,7 @@
 #### events `/api/events`
 
 - `get` `/api/events/` get events
+- `get` `/api/events/recommended` get recommended events
 - `post` `/api/events/create` create event
 - `post` `/api/events/check-qrcode` check qr code
 - `get` `/api/events/:id` get event information

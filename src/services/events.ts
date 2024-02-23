@@ -58,8 +58,6 @@ export async function getEvents(filter: {
 }) {
   const eventName = filter.event.name?.toLowerCase();
 
-  // fix participant number sort
-
   // init aggregate and stages
   const aggregate: PipelineStage[] = [];
   const matches: Record<string, any> = {};
