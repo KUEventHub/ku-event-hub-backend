@@ -9,6 +9,7 @@ import { toArray } from "../services/mongoose.ts";
 import User from "../schema/User.ts";
 import FriendRequest from "../schema/FriendRequest.ts";
 import { ROLES } from "../helper/constants.ts";
+import BanLog from "../schema/BanLog.ts";
 
 const router = Router();
 
@@ -215,6 +216,16 @@ router.post(
         return;
       }
 
+      const targetUserBan = await BanLog.findById(targetUser.ban);
+
+      // check if target user is banned
+      if (targetUserBan && targetUserBan.isActive) {
+        res.status(400).send({
+          error: "You can't send friend requests to a banned user",
+        });
+        return;
+      }
+
       // check if you are not sending the request to yourself
       if (currentUser._id.toString() === targetUser._id.toString()) {
         res.status(400).send({
@@ -415,6 +426,16 @@ router.post(
         return;
       }
 
+      const targetUserBan = await BanLog.findById(targetUser.ban);
+
+      // check if target user is banned
+      if (targetUserBan && targetUserBan.isActive) {
+        res.status(400).send({
+          error: "You can't send friend requests to a banned user",
+        });
+        return;
+      }
+
       // accept the friend request
       friendRequest.isResponded = true;
       friendRequest.isAccepted = true;
@@ -539,7 +560,17 @@ router.post(
         return;
       }
 
-      // accept the friend request
+      const targetUserBan = await BanLog.findById(targetUser.ban);
+
+      // check if target user is banned
+      if (targetUserBan && targetUserBan.isActive) {
+        res.status(400).send({
+          error: "You can't send friend requests to a banned user",
+        });
+        return;
+      }
+
+      // reject the friend request
       friendRequest.isResponded = true;
       friendRequest.isAccepted = false;
       friendRequest.updatedAt = new Date();
