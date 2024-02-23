@@ -18,6 +18,7 @@
 - `post` `/api/users/:id/edit` edit user information
 - `post` `/api/users/:id/edit-privacy` edit user privacy
 - `post` `/api/users/:id/unfriend` unfriend user
+- `post` `/api/users/:id/ban` ban user
 
 #### events `/api/events`
 
