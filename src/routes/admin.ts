@@ -70,6 +70,38 @@ router.get("/user-list", checkAccessToken, checkAdminRole, async (req, res) => {
               },
             },
             {
+              $lookup: {
+                from: TABLES.BAN_LOG,
+                let: { bannedUser: "$_id" },
+                pipeline: [
+                  {
+                    $match: {
+                      $expr: {
+                        $and: [
+                          { $eq: ["$bannedUser", "$$bannedUser"] },
+                          { $eq: ["$isActive", true] },
+                        ],
+                      },
+                    },
+                  },
+                ],
+                as: "ban",
+              },
+            },
+            {
+              $addFields: {
+                isBanned: {
+                  $anyElementTrue: {
+                    $map: {
+                      input: "$ban",
+                      as: "ban",
+                      in: "$$ban.isActive",
+                    },
+                  },
+                },
+              },
+            },
+            {
               $sort: {
                 "loginLog.time": -1, // sort by time in descending order
               },
@@ -88,6 +120,7 @@ router.get("/user-list", checkAccessToken, checkAdminRole, async (req, res) => {
                     $ifNull: ["$loginLog.time", "$createdAt", new Date(0)], // provide a default value if there's no login log
                   },
                 },
+                isBanned: { $first: "$isBanned" },
               },
             },
             {
