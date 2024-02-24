@@ -192,9 +192,17 @@ router.get(
             username: 1,
             firstName: 1,
             lastName: 1,
+            profilePictureUrl: 1,
             "ban._id": 1,
             "ban.time": 1,
             "ban.reason": 1,
+          },
+        },
+        {
+          $addFields: {
+            ban: {
+              $arrayElemAt: ["$ban", 0], // get the first element of the ban array
+            },
           },
         },
         {
