@@ -115,6 +115,7 @@ router.get("/user-list", checkAccessToken, checkAdminRole, async (req, res) => {
                 lastName: { $first: "$lastName" },
                 profilePictureUrl: { $first: "$profilePictureUrl" },
                 email: { $first: "$email" },
+                auth0UserId: { $first: "$auth0UserId" },
                 loginTime: {
                   $first: {
                     $ifNull: ["$loginLog.time", "$createdAt", new Date(0)], // provide a default value if there's no login log
@@ -226,6 +227,7 @@ router.get(
             firstName: 1,
             lastName: 1,
             profilePictureUrl: 1,
+            auth0UserId: 1,
             "ban._id": 1,
             "ban.time": 1,
             "ban.reason": 1,
@@ -276,7 +278,10 @@ router.get(
 
       const users = aggregatedUsers[0].paginatedData;
 
-      const totalUsers = aggregatedUsers[0].totalCount[0].count;
+      const totalUsers =
+        aggregatedUsers[0].totalCount.length > 0
+          ? aggregatedUsers[0].totalCount[0].count
+          : 0;
 
       const noPages = Math.ceil(totalUsers / pageSize);
 
