@@ -489,11 +489,20 @@ router.post(
         return;
       }
 
-      const decryptedText = decryptSymmetric(
-        qrcodeEncryptionKey,
-        qrcodeString,
-        event.qrCodeIv
-      );
+      let decryptedText;
+
+      try {
+        decryptedText = decryptSymmetric(
+          qrcodeEncryptionKey,
+          qrcodeString,
+          event.qrCodeIv
+        );
+      } catch (e: any) {
+        res.status(400).send({
+          error: "Invalid QR Code",
+        });
+        return;
+      }
 
       const decryptedTextArray = decryptedText.split("|");
       const decryptedEventId = decryptedTextArray[0];
@@ -598,6 +607,7 @@ router.get("/:id", async (req, res) => {
       : false;
 
     const eventJson = {
+      _id: event._id,
       name: event.name,
       imageUrl: event.imageUrl,
       eventTypes: eventTypes,
