@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   checkAccessToken,
   checkAdminRole,
+  checkRole,
   checkSameUser,
   checkUserBan,
   checkUserRole,
@@ -28,6 +29,8 @@ import { findEventWithId } from "../services/events.ts";
 import LoginLog from "../schema/LoginLog.ts";
 import BanLog from "../schema/BanLog.ts";
 import User from "../schema/User.ts";
+import EventType from "../schema/EventType.ts";
+import { formatEventSummary } from "../helper/eventSummary.ts";
 
 const router = Router();
 
@@ -155,6 +158,7 @@ router.post("/create", checkAccessToken, async (req, res) => {
     res.status(200).send({
       message: "User created successfully",
       id: user._id,
+      profilePictureUrl: profilePictureUrl,
     });
   } catch (e: any) {
     // handle errors
@@ -182,36 +186,44 @@ router.post("/create", checkAccessToken, async (req, res) => {
       },
     }
  */
-router.get("/me", checkAccessToken, checkUserBan, async (req, res) => {
-  try {
-    const token = req.get("Authorization");
-    const auth0id = getAuth0Id(token!);
-    const user = await findUserWithAuth0Id(auth0id);
+router.get(
+  "/me",
+  checkAccessToken,
+  checkRole,
+  checkUserBan,
+  async (req, res) => {
+    try {
+      const token = req.get("Authorization");
+      const auth0id = getAuth0Id(token!);
+      const user = await findUserWithAuth0Id(auth0id);
 
-    if (!user) {
-      res.status(404).send({
-        error: "User not found",
+      if (!user) {
+        res.status(404).send({
+          error: "User not found",
+        });
+        return;
+      }
+
+      const userObj = {
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        profilePictureUrl: user.profilePictureUrl,
+      };
+
+      res.status(200).send({
+        message: "User found successfully",
+        user: userObj,
       });
-      return;
+    } catch (e: any) {
+      // handle errors
+      console.error(e);
+      res.status(400).send(e);
     }
-
-    const userObj = {
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      profilePictureUrl: user.profilePictureUrl,
-    };
-
-    res.status(200).send({
-      message: "User found successfully",
-      user: userObj,
-    });
-  } catch (e: any) {
-    // handle errors
-    console.error(e);
-    res.status(400).send(e);
   }
-});
+);
+
+
 
 /**
  * @route post /api/users/login
@@ -733,6 +745,7 @@ router.get(
  * results:
  * {
       message: "User updated successfully",
+      profilePictureUrl: string;
     }
  */
 router.post(
@@ -811,6 +824,7 @@ router.post(
 
       res.status(200).send({
         message: "User updated successfully",
+        profilePictureUrl: profilePictureUrl,
       });
     } catch (e: any) {
       // handle errors
