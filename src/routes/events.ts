@@ -1079,7 +1079,11 @@ router.post(
             // find participation with this event id
             participation.event.toString() === event._id.toString() &&
             // check if participation is active
-            participation.isActive
+            participation.isActive &&
+            // check if participation is confirmed
+            // no leaving on confirmed participations
+            // filter it out before checking
+            !participation.isConfirmed
           );
         }
       );
