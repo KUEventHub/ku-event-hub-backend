@@ -101,11 +101,7 @@ router.get("/user-list", checkAccessToken, checkAdminRole, async (req, res) => {
                 },
               },
             },
-            {
-              $sort: {
-                "loginLog.time": -1, // sort by time in descending order
-              },
-            },
+
             {
               $group: {
                 _id: "$_id",
@@ -117,11 +113,16 @@ router.get("/user-list", checkAccessToken, checkAdminRole, async (req, res) => {
                 email: { $first: "$email" },
                 auth0UserId: { $first: "$auth0UserId" },
                 loginTime: {
-                  $first: {
+                  $max: {
                     $ifNull: ["$loginLog.time", "$createdAt", new Date(0)], // provide a default value if there's no login log
                   },
                 },
                 isBanned: { $first: "$isBanned" },
+              },
+            },
+            {
+              $sort: {
+                "loginTime": -1, // sort by time in descending order
               },
             },
             {
