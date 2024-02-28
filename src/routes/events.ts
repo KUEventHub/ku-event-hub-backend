@@ -1054,6 +1054,14 @@ router.post(
         return;
       }
 
+      // check if event is active
+      if (!event.isActive) {
+        res.status(400).send({
+          error: "Event is not active",
+        });
+        return;
+      }
+
       // check if event is deactivated
       if (event.isDeactivated) {
         res.status(400).send({
