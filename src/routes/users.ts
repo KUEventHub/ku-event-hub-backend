@@ -223,7 +223,116 @@ router.get(
   }
 );
 
+/**
+ * @route get /api/users/event-summary
+ * gets the event summary of said user
+ *
+ * requirements:
+ * - authorization: Bearer <access_token>
+ * - auth0 role: user
+ * - params: {
+ *     filterConfirmed?: boolean;
+ *  }
+ *
+ * results:
+ * {
+      message: "Summary made successfully",
+      summary,
+    }
+ */
+router.get(
+  "/event-summary",
+  checkAccessToken,
+  checkUserRole,
+  checkUserBan,
+  async (req, res) => {
+    const filterConfirmed: boolean = req.query.filterConfirmed
+      ? req.query.filterConfirmed.toString().toLowerCase() === "true"
+      : false;
+    try {
+      // find current user
+      const token = req.get("Authorization");
+      const auth0id = getAuth0Id(token!);
+      const user = await findUserWithAuth0Id(auth0id);
 
+      if (!user) {
+        res.status(404).send({
+          error: "User not found",
+        });
+        return;
+      }
+
+      // populate user's joined events
+      await user.populate({
+        path: "joinedEvents",
+        populate: {
+          path: "event",
+          populate: "eventTypes",
+        },
+      });
+
+      let participations = toArray(user.joinedEvents);
+
+      // filter active participations
+      participations = participations.filter(
+        (participation) => participation.isActive
+      );
+
+      // filter confirmed events
+      if (filterConfirmed) {
+        participations = participations.filter(
+          (participation) => participation.isConfirmed
+        );
+      }
+
+      // filter deactivated events
+      participations = participations.filter(
+        (participation) => !participation.event.isDeactivated
+      );
+
+      // group participations by event types
+      const eventTypes = await EventType.find();
+
+      const eventSummary = eventTypes.map((eventType) => {
+        const filteredParts = participations.filter((participation) =>
+          toArray(participation.event.eventTypes).some(
+            (_eventType) =>
+              _eventType._id.toString() === eventType._id.toString()
+          )
+        );
+
+        const events = filteredParts.map(
+          (participation) => participation.event
+        );
+
+        let totalHours = 0;
+
+        events.forEach((event) => {
+          const hours = event.activityHours;
+          totalHours += hours;
+        });
+
+        return {
+          name: eventType.name,
+          count: events.length,
+          hours: totalHours,
+          events: events,
+        };
+      });
+
+      const formattedSummary = await formatEventSummary(eventSummary);
+
+      res.status(200).send({
+        message: "Summary made successfully",
+        summary: formattedSummary,
+      });
+    } catch (e: any) {
+      // handle errors
+      console.error(e);
+      res.status(400).send(e);
+    }
+  }
+);
 
 /**
  * @route post /api/users/login

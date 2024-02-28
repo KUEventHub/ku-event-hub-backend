@@ -20,6 +20,7 @@
 - `post` `/api/users/:id/unfriend` unfriend user
 - `post` `/api/users/:id/ban` ban user
 - `post` `/api/users/:id/unban` unban user
+- `get` `/api/users/event-summary` get user event summary
 
 #### events `/api/events`
 

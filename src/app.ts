@@ -45,7 +45,9 @@ app.use("/api/friend-requests", friendRequestRouter);
 app.use("/api/admin", adminRouter);
 
 app.listen(port, () => {
-  console.log(`[server]: Server is running at http://localhost:${port}`);
+  console.log(
+    `\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n[server]: Server is running at http://localhost:${port}\n`
+  );
 });
 
 // check active events and ban every hour
