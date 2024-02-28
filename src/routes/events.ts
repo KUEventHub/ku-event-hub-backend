@@ -557,6 +557,7 @@ router.post(
           profilePictureUrl: string,
         }[]
         userHasJoinedEvent: boolean,
+        hasQrCode: boolean,
       }
     }
  */
@@ -631,6 +632,7 @@ router.get("/:id", async (req, res) => {
       }),
       // check if (signed in/self) user has joined this event
       userHasJoinedEvent: Boolean(userHasJoinedEvent),
+      hasQrCode: Boolean(event.qrCodeString),
     };
 
     res.status(200).send({
