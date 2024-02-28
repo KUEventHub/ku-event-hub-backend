@@ -82,6 +82,47 @@ export const checkUserRole: RequestHandler = async (req, res, next) => {
 };
 
 /**
+ * Middleware: checks if the user has the same role as in database.
+ */
+export const checkRole: RequestHandler = async (req, res, next) => {
+  // check user token
+  const token = req.get("Authorization");
+
+  // if user doesn't have access token
+  // return 401 Unauthorized
+  if (!token) {
+    res.status(401).send("Unauthorized");
+    return;
+  }
+
+  // decode token and get user's role
+  const decodedToken = jwtDecode(token);
+  const auth0Role = decodedToken["ku-event-hub-roles"][0]; // you can only have one role for now
+
+  const auth0id = getAuth0Id(token!);
+  const auth0user = await findUserWithAuth0Id(auth0id);
+
+  if (!auth0user) {
+    res.status(404).send({
+      error: "User not found",
+    });
+    return;
+  }
+
+  const userRole = auth0user.role;
+
+  if (userRole !== auth0Role) {
+    await auth0user.updateOne({
+      role: auth0Role,
+      updatedAt: Date.now(),
+    });
+  }
+
+  // continue
+  next();
+};
+
+/**
  * Middleware: checks if the user is the same user in the url.
  */
 export const checkSameUser: RequestHandler = async (req, res, next) => {
