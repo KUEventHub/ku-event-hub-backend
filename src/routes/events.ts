@@ -15,7 +15,7 @@ import {
   getImageUrl,
   updateEvent,
 } from "../services/events.ts";
-import { EVENT_SORT_TYPES, TABLES } from "../helper/constants.ts";
+import { EVENT_SORT_TYPES, ROLES, TABLES } from "../helper/constants.ts";
 import { toArray } from "../services/mongoose.ts";
 import Participation from "../schema/Participation.ts";
 import QRCode from "qrcode";
@@ -555,9 +555,16 @@ router.post(
           _id: string,
           name: string,
           profilePictureUrl: string,
+          isSelf: boolean,
         }[]
         userHasJoinedEvent: boolean,
         hasQrCode: boolean,
+        confirmedParticipants: {
+          _id: string,
+          name: string,
+          profilePictureUrl: string,
+          isSelf: boolean,
+        }[] // only shown when user's role is admin
       }
     }
  */
@@ -590,12 +597,14 @@ router.get("/:id", async (req, res) => {
     // find user (if signed in)
     const token = req.get("Authorization");
     const user = token ? await findUserWithAuth0Id(getAuth0Id(token)) : null;
+    const isAdmin = user ? user.role === ROLES.ADMIN : false;
 
     // find active participants
     const participants = toArray(event.participants);
     const activeParticipants = participants.filter(
       (participation) => participation.isActive
     );
+
     const eventTypes = toArray(event.eventTypes).map(
       (eventType) => eventType.name
     );
@@ -607,7 +616,7 @@ router.get("/:id", async (req, res) => {
         )
       : false;
 
-    const eventJson = {
+    const eventJson: any = {
       _id: event._id,
       name: event.name,
       imageUrl: event.imageUrl,
@@ -634,6 +643,22 @@ router.get("/:id", async (req, res) => {
       userHasJoinedEvent: Boolean(userHasJoinedEvent),
       hasQrCode: Boolean(event.qrCodeString),
     };
+
+    // if user is admin, show confirmed participants
+    if (isAdmin) {
+      eventJson.confirmedParticipants = participants
+        .filter((participation) => participation.isConfirmed)
+        .map((participation) => {
+          return {
+            _id: participation.user._id,
+            name: participation.user.username,
+            profilePictureUrl: participation.user.profilePictureUrl,
+            isSelf: user
+              ? user._id.toString() === participation.user._id.toString()
+              : false,
+          };
+        });
+    }
 
     res.status(200).send({
       message: "Event found successfully",
