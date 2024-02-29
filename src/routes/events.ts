@@ -559,6 +559,7 @@ router.post(
         }[]
         userHasJoinedEvent: boolean,
         hasQrCode: boolean,
+        userHasConfirmedParticipation: boolean,
         confirmedParticipants: {
           _id: string,
           name: string,
@@ -616,6 +617,14 @@ router.get("/:id", async (req, res) => {
         )
       : false;
 
+    const userHasConfirmedParticipation = user
+      ? activeParticipants.find(
+          (participation) =>
+            participation.user._id.toString() === user._id.toString() &&
+            participation.isConfirmed
+        )
+      : false;
+
     const eventJson: any = {
       _id: event._id,
       name: event.name,
@@ -641,7 +650,10 @@ router.get("/:id", async (req, res) => {
       }),
       // check if (signed in/self) user has joined this event
       userHasJoinedEvent: Boolean(userHasJoinedEvent),
+      // check if event has a qr code
       hasQrCode: Boolean(event.qrCodeString),
+      // check if (signed in/self) user has confirmed participation
+      userHasConfirmedParticipation: Boolean(userHasConfirmedParticipation),
     };
 
     // if user is admin, show confirmed participants
