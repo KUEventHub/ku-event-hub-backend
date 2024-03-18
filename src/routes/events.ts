@@ -552,20 +552,23 @@ router.post(
         description: string,
         isActive: boolean,
         participants: {
+          // always show
           _id: string,
-          name: string,
+          username: string,
           profilePictureUrl: string,
+
+          // only show if user is not admin
           isSelf: boolean,
+
+          // only show if user is admin
+          idCode: string,
+          firstName: string,
+          lastName: string,
+          isConfirmed: boolean,
         }[]
         userHasJoinedEvent: boolean,
         hasQrCode: boolean,
         userHasConfirmedParticipation: boolean,
-        confirmedParticipants: {
-          _id: string,
-          name: string,
-          profilePictureUrl: string,
-          isSelf: boolean,
-        }[] // only shown when user's role is admin
       }
     }
  */
@@ -638,16 +641,6 @@ router.get("/:id", async (req, res) => {
       participantsCount: activeParticipants.length,
       description: event.description,
       isActive: event.isActive,
-      participants: activeParticipants.map((participation) => {
-        return {
-          _id: participation.user._id,
-          name: participation.user.username,
-          profilePictureUrl: participation.user.profilePictureUrl,
-          isSelf: user
-            ? user._id.toString() === participation.user._id.toString()
-            : false,
-        };
-      }),
       // check if (signed in/self) user has joined this event
       userHasJoinedEvent: Boolean(userHasJoinedEvent),
       // check if event has a qr code
@@ -656,20 +649,33 @@ router.get("/:id", async (req, res) => {
       userHasConfirmedParticipation: Boolean(userHasConfirmedParticipation),
     };
 
-    // if user is admin, show confirmed participants
+    // if user is admin, show participants in a table
+    // with "participated" and "confirmed" per user
     if (isAdmin) {
-      eventJson.confirmedParticipants = participants
-        .filter((participation) => participation.isConfirmed)
-        .map((participation) => {
-          return {
-            _id: participation.user._id,
-            name: participation.user.username,
-            profilePictureUrl: participation.user.profilePictureUrl,
-            isSelf: user
-              ? user._id.toString() === participation.user._id.toString()
-              : false,
-          };
-        });
+      eventJson.participants = activeParticipants.map((participation) => {
+        return {
+          _id: participation.user._id,
+          idCode: participation.user.idCode,
+          firstName: participation.user.firstName,
+          lastName: participation.user.lastName,
+          username: participation.user.username,
+          profilePictureUrl: participation.user.profilePictureUrl,
+          isConfirmed: participation.isConfirmed,
+        };
+      });
+    } else {
+      // if user is not admin, only have participants
+      // no confirmed status given
+      eventJson.participants = activeParticipants.map((participation) => {
+        return {
+          _id: participation.user._id,
+          username: participation.user.username,
+          profilePictureUrl: participation.user.profilePictureUrl,
+          isSelf: user
+            ? user._id.toString() === participation.user._id.toString()
+            : false,
+        };
+      });
     }
 
     res.status(200).send({
