@@ -1243,7 +1243,7 @@ router.get(
       }
 
       res.status(200).send({
-        message: "Event QR Code not yet generated. Successfully generated one.",
+        message: "Event QR Code code found successfully",
         qrCodeString: event.qrCodeString,
       });
     } catch (e: any) {
