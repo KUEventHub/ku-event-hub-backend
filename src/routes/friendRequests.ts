@@ -677,7 +677,7 @@ router.post(
         return;
       }
 
-      // accept the friend request
+      // cancel the friend request
       friendRequest.isResponded = true;
       friendRequest.isCancelled = true;
       friendRequest.updatedAt = new Date();
