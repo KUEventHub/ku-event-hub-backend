@@ -983,13 +983,29 @@ router.post(
         return;
       }
 
+      // get the event's participation
+      await event.populate("participants");
+      const eventParticipations = toArray(event.participants);
+      const joinedEventParticipations = eventParticipations.filter(
+        (participation) => {
+          return (
+            // find participation with this user id
+            participation.user.toString() === user._id.toString() &&
+            // check if participation is active
+            participation.isActive
+          );
+        }
+      );
+
       // check if event is full
-      if (joinedParticipations.length >= event.totalSeats) {
+      if (joinedEventParticipations.length >= event.totalSeats) {
         res.status(400).send({
           error: "Event is full",
         });
         return;
       }
+
+      event.depopulate("participants");
 
       // add participation
       const participation = new Participation({
