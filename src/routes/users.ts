@@ -103,6 +103,14 @@ router.post("/create", checkAccessToken, async (req, res) => {
         ? eventTypes.map((eventType) => eventType!._id)
         : [];
 
+    // check if name is alphanumeric
+    if (!/^[a-zA-Z0-9 ]+$/.test(body.user.username)) {
+      res.status(400).send({
+        error: "Username must be alphanumeric",
+      });
+      return;
+    }
+
     const userJson = {
       username: body.user.username,
       firstName: body.user.firstName,
@@ -904,6 +912,14 @@ router.post(
         eventTypes.length > 0
           ? eventTypes.map((eventType) => eventType!._id)
           : [];
+
+      // check if name is alphanumeric
+      if (body.user.username && !/^[a-zA-Z0-9 ]+$/.test(body.user.username)) {
+        res.status(400).send({
+          error: "Username must be alphanumeric",
+        });
+        return;
+      }
 
       const userJson: any = {
         username: body.user.username,
